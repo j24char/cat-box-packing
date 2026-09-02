@@ -31,6 +31,8 @@ export const FONTS = {
   body: 'Fredoka-Regular',
 };
 
+export type FontFamily = keyof typeof FONTS;
+
 export const SHADOWS = StyleSheet.create({
   button: {
     shadowColor: COLORS.shadowColor,

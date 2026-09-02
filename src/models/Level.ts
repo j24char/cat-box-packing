@@ -1,6 +1,6 @@
 // src/models/Level.ts
 
-import { CatPiece } from './Cat';
+import { CatBreed, CatPiece, CatPose, getCatCellCount, getCatShape } from './Cat';
 
 export interface BoxGridConfig {
   rows: number;
@@ -21,87 +21,84 @@ export interface Level {
   availableCats: CatPiece[];
 }
 
+const BREEDS: CatBreed[] = ['calico', 'tabby', 'orange', 'silver', 'tuxedo', 'black', 'white'];
+
+const getPlayableCellCount = (gridConfig: BoxGridConfig): number => {
+  const rows = gridConfig.mask ?? Array.from({ length: gridConfig.rows }, () => Array(gridConfig.cols).fill(1));
+  return rows.reduce((total, row) => total + row.reduce((rowTotal, cell) => rowTotal + (cell === 0 ? 0 : 1), 0), 0);
+};
+
+const generateLevelCats = (levelId: number, gridConfig: BoxGridConfig): CatPiece[] => {
+  const playableCellCount = getPlayableCellCount(gridConfig);
+  let remainingCells = Math.max(playableCellCount, 1);
+  const generatedCats: CatPiece[] = [];
+
+  while (remainingCells > 0) {
+    let selectedPose: CatPose;
+    let cellCount: number;
+
+    if (remainingCells >= 4) {
+      const largeOptions: CatPose[] = ['curl', 'stretch', 'loaf'];
+      selectedPose = largeOptions[(levelId + generatedCats.length) % largeOptions.length];
+      cellCount = 4;
+    } else if (remainingCells === 3) {
+      selectedPose = 'sitting';
+      cellCount = 2;
+    } else if (remainingCells >= 2) {
+      selectedPose = 'sitting';
+      cellCount = 2;
+    } else {
+      selectedPose = 'kitten';
+      cellCount = 1;
+    }
+
+    const shapeMatrix = getCatShape(selectedPose);
+    generatedCats.push({
+      id: `cat-${levelId}-${generatedCats.length + 1}`,
+      breed: BREEDS[(levelId + generatedCats.length) % BREEDS.length],
+      pose: selectedPose,
+      isAwake: selectedPose !== 'sitting',
+      shapeMatrix,
+    });
+
+    remainingCells -= cellCount;
+  }
+
+  return generatedCats;
+};
+
+const createLevel = (id: number, title: string, rows: number, cols: number, maxMoves: number, targetScore: number, mask?: number[][]): Level => ({
+  id,
+  title,
+  maxMoves,
+  targetScore,
+  gridConfig: { rows, cols, mask },
+  availableCats: generateLevelCats(id, { rows, cols, mask }),
+});
+
 /**
  * Sample levels for Cat Box Packing
  */
 export const SAMPLE_LEVELS: Level[] = [
-  {
-    id: 1,
-    title: 'Level 1 - Cozy Corner',
-    maxMoves: 10,
-    targetScore: 1000,
-    gridConfig: {
-      rows: 2,
-      cols: 2,
-      mask: [
-        [1, 1],
-        [1, 1],
-      ],
-    },
-    availableCats: [
-      {
-        id: 'cat-1',
-        breed: 'calico',
-        pose: 'curl',
-        isAwake: false,
-        shapeMatrix: [[1, 1]],
-      },
-      {
-        id: 'cat-2',
-        breed: 'orange',
-        pose: 'loaf',
-        isAwake: false,
-        shapeMatrix: [[1, 1]],
-      },
-    ],
-  },
-  {
-    id: 14,
-    title: 'Level 14 - Cardboard Chaos',
-    maxMoves: 20,
-    targetScore: 4850,
-    gridConfig: {
-      rows: 4,
-      cols: 4,
-      mask: [
-        [1, 1, 1, 1],
-        [1, 1, 1, 1],
-        [1, 1, 1, 0],
-        [1, 1, 1, 1],
-      ],
-    },
-    availableCats: [
-      {
-        id: 'cat-14-1',
-        breed: 'calico',
-        pose: 'curl',
-        isAwake: false,
-        shapeMatrix: [
-          [1, 1],
-          [1, 0],
-        ],
-      },
-      {
-        id: 'cat-14-2',
-        breed: 'black',
-        pose: 'stretch',
-        isAwake: true,
-        shapeMatrix: [[1, 1, 1]],
-      },
-      {
-        id: 'cat-14-3',
-        breed: 'tabby',
-        pose: 'loaf',
-        isAwake: false,
-        shapeMatrix: [[1, 1]],
-      },
-      {
-        id: 'cat-14-4',
-        breed: 'silver',
-        pose: 'sitting',
-        isAwake: false,
-        shapeMatrix: [[1]],
-      },
-    ],
-  },
+  createLevel(1, 'Level 1 - Cozy Corner', 2, 2, 10, 1000, [
+    [1, 1],
+    [1, 1],
+  ]),
+  createLevel(2, 'Level 2 - Tight Spaces', 3, 3, 15, 2000, [
+    [1, 1, 1],
+    [1, 0, 1],
+    [1, 1, 1],
+  ]),
+  createLevel(3, 'Level 3 - Open Floor', 4, 4, 20, 3000, [
+    [1, 1, 1, 1],
+    [1, 1, 1, 1],
+    [1, 1, 1, 1],
+    [1, 1, 1, 1],
+  ]),
+  createLevel(14, 'Level 14 - Cardboard Chaos', 4, 4, 20, 4850, [
+    [1, 1, 1, 1],
+    [1, 1, 1, 1],
+    [1, 1, 1, 0],
+    [1, 1, 1, 1],
+  ]),
 ];

@@ -4,6 +4,25 @@ import { CatPiece, GridCoordinates } from '../models/Cat';
 import { BoxGridConfig } from '../models/Level';
 
 /**
+ * Rotates a matrix 90 degrees clockwise.
+ * @param matrix The input matrix to rotate.
+ * @returns The rotated matrix.
+ */
+export function rotateMatrix(matrix: number[][]): number[][] {
+  const rows = matrix.length;
+  const cols = matrix[0].length;
+  const rotated: number[][] = Array.from({ length: cols }, () => Array(rows).fill(0));
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      rotated[c][rows - 1 - r] = matrix[r][c];
+    }
+  }
+
+  return rotated;
+}
+
+/**
  * Checks if a cat piece's matrix overlaps with any unplayable/blocked mask cells
  * or extends outside the board boundaries.
  */
@@ -73,22 +92,43 @@ export const isCellOccupiedByCat = (
 };
 
 /**
- * Checks if all required cats for the level are completely placed on the board.
+ * Checks whether the whole playable board is filled by placed cats.
  */
 export const isLevelComplete = (
   allLevelCats: CatPiece[],
   placedCats: CatPiece[],
   gridConfig: BoxGridConfig
 ): boolean => {
-  if (placedCats.length !== allLevelCats.length) return false;
+  const mask = gridConfig.mask ?? Array.from({ length: gridConfig.rows }, () => Array(gridConfig.cols).fill(1));
+  const playableCellCount = mask.reduce(
+    (total, row) => total + row.reduce((rowTotal, cell) => rowTotal + (cell === 0 ? 0 : 1), 0),
+    0
+  );
 
-  return placedCats.every((cat) => {
+  const filledCells = new Set<string>();
+
+  for (const cat of placedCats) {
     if (!cat.currentPosition) return false;
-    return isValidPlacement(
-      cat,
-      cat.currentPosition,
-      gridConfig,
-      placedCats.filter((c) => c.id !== cat.id)
-    );
-  });
+
+    for (let r = 0; r < cat.shapeMatrix.length; r++) {
+      for (let c = 0; c < cat.shapeMatrix[r].length; c++) {
+        if (cat.shapeMatrix[r][c] === 0) continue;
+
+        const boardX = cat.currentPosition.x + c;
+        const boardY = cat.currentPosition.y + r;
+
+        if (boardX < 0 || boardX >= gridConfig.cols || boardY < 0 || boardY >= gridConfig.rows) {
+          return false;
+        }
+
+        if (mask[boardY]?.[boardX] === 0) {
+          return false;
+        }
+
+        filledCells.add(`${boardX},${boardY}`);
+      }
+    }
+  }
+
+  return filledCells.size === playableCellCount && placedCats.length === allLevelCats.length;
 };

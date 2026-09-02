@@ -9,6 +9,8 @@ interface CatSpriteProps {
   breed: CatBreed;
   pose: CatPose;
   size?: number;
+  width?: number;
+  height?: number;
   style?: ViewStyle;
 }
 
@@ -27,10 +29,14 @@ export const CatSprite: React.FC<CatSpriteProps> = ({
   breed,
   pose,
   size = 60,
+  width,
+  height,
   style,
 }) => {
   const colors = BREED_COLORS[breed] || BREED_COLORS.orange;
-  const scale = size / 100;
+  const canvasWidth = width ?? size;
+  const canvasHeight = height ?? size;
+  const scale = Math.min(canvasWidth, canvasHeight) / 100;
 
   const getPosePaths = () => {
     switch (pose) {
@@ -148,7 +154,7 @@ export const CatSprite: React.FC<CatSpriteProps> = ({
   const { bodyPath, ears, tail } = getPosePaths();
 
   return (
-    <Canvas style={[{ width: size, height: size }, style]}>
+    <Canvas style={[{ width: canvasWidth, height: canvasHeight }, style]}>
       {tail && (
         <Path
           path={tail}
