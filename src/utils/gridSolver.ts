@@ -9,6 +9,9 @@ import { BoxGridConfig } from '../models/Level';
  * @returns The rotated matrix.
  */
 export function rotateMatrix(matrix: number[][]): number[][] {
+  if (!matrix.length || !matrix[0]?.length) {
+    return matrix.map((row) => [...row]);
+  }
   const rows = matrix.length;
   const cols = matrix[0].length;
   const rotated: number[][] = Array.from({ length: cols }, () => Array(rows).fill(0));
@@ -131,4 +134,21 @@ export const isLevelComplete = (
   }
 
   return filledCells.size === playableCellCount && placedCats.length === allLevelCats.length;
+};
+
+export const getOccupiedCells = (
+  shapeMatrix: number[][],
+  origin: GridCoordinates
+): GridCoordinates[] => {
+  const cells: GridCoordinates[] = [];
+
+  for (let r = 0; r < shapeMatrix.length; r++) {
+    for (let c = 0; c < shapeMatrix[r].length; c++) {
+      if (shapeMatrix[r][c] === 1) {
+        cells.push({ x: origin.x + c, y: origin.y + r });
+      }
+    }
+  }
+
+  return cells;
 };

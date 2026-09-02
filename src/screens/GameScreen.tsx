@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   StyleSheet,
   ImageBackground,
   Dimensions,
+  Modal,
 } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -13,88 +14,116 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
+  withSequence,
+  withTiming,
   runOnJS,
   type SharedValue,
 } from 'react-native-reanimated';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { Board } from '../components/Board';
 import { CatSprite } from '../components/CatSprite';
+import { GameButton } from '../components/GameButton';
 import { useGameState } from '../hooks/useGameState';
 import { useAudio } from '../hooks/useAudio';
+import { useLevelProgress } from '../hooks/useLevelProgress';
 import { COLORS, globalStyles } from '../constants/theme';
 import { CatPiece, GridCoordinates, getCatShapeSize } from '../models/Cat';
-import { BoxGridConfig } from '../models/Level';
-import { isValidPlacement } from '../utils/gridSolver';
+import { BoxGridConfig, getNextLevelId, starsFromJumpOuts } from '../models/Level';
+import { getOccupiedCells, isValidPlacement } from '../utils/gridSolver';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Game'>;
 
-const TILE_SIZE = 60;
-const BOARD_PADDING = 16;
+const FIRST_JUMP_MS = 10000;
+const NEXT_JUMP_MS = 6000;
 
-interface BoardRect {
+interface ScreenRect {
   x: number;
   y: number;
   width: number;
   height: number;
 }
 
-interface HoverState {
-  x: SharedValue<number>;
-  y: SharedValue<number>;
-  width: SharedValue<number>;
-  height: SharedValue<number>;
-  visible: SharedValue<boolean>;
-  isValid: SharedValue<boolean>;
+interface HoverCell {
+  x: number;
+  y: number;
+  valid: boolean;
 }
 
 interface DraggableCatProps {
   cat: CatPiece;
-  boardRect: BoardRect | null;
+  trayIndex: number;
+  trayCount: number;
+  tileSize: number;
+  gridRect: ScreenRect | null;
+  overlayRect: ScreenRect | null;
   gridConfig: BoxGridConfig;
   existingCats: CatPiece[];
-  onDropCat: (catId: string, coords: GridCoordinates | null) => void;
+  onDropCat: (catId: string, coords: GridCoordinates | null, valid: boolean) => void;
+  onRotate: (catId: string) => void;
+  onDragChange: (dragging: boolean) => void;
   draggingCatId: SharedValue<string | null>;
-  hoverState: HoverState;
-  index: number;
+  onHoverCells: (cells: HoverCell[] | null) => void;
+  ejectedCatId: string | null;
 }
+
+const toLocal = (windowX: number, windowY: number, overlay: ScreenRect | null) => ({
+  x: windowX - (overlay?.x ?? 0),
+  y: windowY - (overlay?.y ?? 0),
+});
+
+const getTrayPosition = (index: number, total: number, overlay: ScreenRect | null) => {
+  const cols = Math.min(4, Math.max(total, 1));
+  const col = index % cols;
+  const row = Math.floor(index / cols);
+  const slot = 68;
+  const totalWidth = cols * slot;
+  const startX = (SCREEN_WIDTH - totalWidth) / 2;
+  const overlayOffsetY = overlay?.y ?? 0;
+  return {
+    x: startX - (overlay?.x ?? 0) + col * slot,
+    y: SCREEN_HEIGHT - overlayOffsetY - 168 + row * 62,
+  };
+};
 
 const DraggableCatPiece: React.FC<DraggableCatProps> = ({
   cat,
-  boardRect,
+  trayIndex,
+  trayCount,
+  tileSize,
+  gridRect,
+  overlayRect,
   gridConfig,
   existingCats,
   onDropCat,
+  onRotate,
+  onDragChange,
   draggingCatId,
-  hoverState,
-  index,
+  onHoverCells,
+  ejectedCatId,
 }) => {
   const { playSound } = useAudio();
-
-  // Resting coordinates in tray
-  const trayX = SCREEN_WIDTH / 2 - 100 + (index % 4) * 55;
-  const trayY = SCREEN_HEIGHT - 170;
-
   const shapeSize = getCatShapeSize(cat.shapeMatrix);
-  const pieceWidth = shapeSize.width * TILE_SIZE;
-  const pieceHeight = shapeSize.height * TILE_SIZE;
+  const pieceWidth = shapeSize.width * tileSize;
+  const pieceHeight = shapeSize.height * tileSize;
+  const tray = getTrayPosition(trayIndex, trayCount, overlayRect);
+  const isPlaced = Boolean(cat.currentPosition && gridRect && overlayRect);
 
-  // Grid inner offset on screen
-  const gridOriginX = boardRect ? boardRect.x + BOARD_PADDING : 0;
-  const gridOriginY = boardRect ? boardRect.y + BOARD_PADDING : 0;
+  const starting = (() => {
+    if (isPlaced && cat.currentPosition && gridRect) {
+      const local = toLocal(
+        gridRect.x + cat.currentPosition.x * tileSize,
+        gridRect.y + cat.currentPosition.y * tileSize,
+        overlayRect
+      );
+      return local;
+    }
+    return tray;
+  })();
 
-  const isPlaced = Boolean(cat.currentPosition && boardRect);
-  const startingX = isPlaced
-    ? gridOriginX + (cat.currentPosition?.x ?? 0) * TILE_SIZE
-    : trayX;
-  const startingY = isPlaced
-    ? gridOriginY + (cat.currentPosition?.y ?? 0) * TILE_SIZE
-    : trayY;
-
-  const globalX = useSharedValue(startingX);
-  const globalY = useSharedValue(startingY);
-
+  const globalX = useSharedValue(starting.x);
+  const globalY = useSharedValue(starting.y);
   const startDragX = useSharedValue(0);
   const startDragY = useSharedValue(0);
   const scale = useSharedValue(1);
@@ -103,112 +132,180 @@ const DraggableCatPiece: React.FC<DraggableCatProps> = ({
     playSound('meow');
   };
 
+  const snapToRest = (ejected: boolean) => {
+    const target = (() => {
+      if (cat.currentPosition && gridRect) {
+        return toLocal(
+          gridRect.x + cat.currentPosition.x * tileSize,
+          gridRect.y + cat.currentPosition.y * tileSize,
+          overlayRect
+        );
+      }
+      return tray;
+    })();
+
+    if (ejected && !cat.currentPosition) {
+      globalY.value = withSequence(
+        withTiming(globalY.value - 48, { duration: 140 }),
+        withSpring(target.y, { damping: 14, stiffness: 110 })
+      );
+      globalX.value = withSpring(target.x, { damping: 14, stiffness: 110 });
+      return;
+    }
+
+    globalX.value = withSpring(target.x, { damping: 15, stiffness: 120 });
+    globalY.value = withSpring(target.y, { damping: 15, stiffness: 120 });
+  };
+
   const calculateGridPos = (absX: number, absY: number) => {
-    if (!boardRect) return null;
+    if (!gridRect) return null;
 
-    // Relative offset against the actual active board grid
-    const relX = absX - gridOriginX;
-    const relY = absY - gridOriginY;
+    const relX = absX - gridRect.x;
+    const relY = absY - gridRect.y;
+    const gridWidth = gridConfig.cols * tileSize;
+    const gridHeight = gridConfig.rows * tileSize;
+    const insideBoard =
+      absX >= gridRect.x &&
+      absY >= gridRect.y &&
+      absX <= gridRect.x + gridWidth &&
+      absY <= gridRect.y + gridHeight;
 
-    const gridX = Math.floor(relX / TILE_SIZE);
-    const gridY = Math.floor(relY / TILE_SIZE);
+    if (!insideBoard) {
+      return null;
+    }
 
-    const isWithinBounds =
-      gridX >= 0 &&
-      gridY >= 0 &&
-      gridX + shapeSize.width <= gridConfig.columns &&
-      gridY + shapeSize.height <= gridConfig.rows;
+    const pointerCellX = Math.floor(relX / tileSize);
+    const pointerCellY = Math.floor(relY / tileSize);
+    const candidatePositions: Array<{ x: number; y: number; distance: number; valid: boolean }> = [];
 
-    if (!isWithinBounds) return null;
+    for (let y = 0; y <= gridConfig.rows - shapeSize.height; y++) {
+      for (let x = 0; x <= gridConfig.cols - shapeSize.width; x++) {
+        const distance =
+          Math.abs(x + (shapeSize.width - 1) / 2 - pointerCellX) +
+          Math.abs(y + (shapeSize.height - 1) / 2 - pointerCellY);
+        const valid = isValidPlacement(
+          cat,
+          { x, y },
+          gridConfig,
+          existingCats.filter((c) => c.id !== cat.id)
+        );
+        candidatePositions.push({ x, y, distance, valid });
+      }
+    }
 
-    const isValid = isValidPlacement(
-      cat,
-      { x: gridX, y: gridY },
-      gridConfig,
-      existingCats.filter((c) => c.id !== cat.id)
+    candidatePositions.sort(
+      (a, b) => a.distance - b.distance || Number(b.valid) - Number(a.valid)
     );
 
-    return { gridX, gridY, isValid };
+    const nearestValid = candidatePositions.find((candidate) => candidate.valid);
+    const nearestAny = candidatePositions[0];
+    const chosen = nearestValid ?? nearestAny;
+
+    if (!chosen) {
+      return null;
+    }
+
+    return {
+      gridX: chosen.x,
+      gridY: chosen.y,
+      isValid: chosen.valid,
+    };
   };
 
   const updateHoverState = (absX: number, absY: number) => {
     const res = calculateGridPos(absX, absY);
     if (res) {
-      hoverState.x.value = res.gridX * TILE_SIZE;
-      hoverState.y.value = res.gridY * TILE_SIZE;
-      hoverState.width.value = shapeSize.width * TILE_SIZE;
-      hoverState.height.value = shapeSize.height * TILE_SIZE;
-      hoverState.isValid.value = res.isValid;
-      hoverState.visible.value = true;
+      onHoverCells(
+        getOccupiedCells(cat.shapeMatrix, { x: res.gridX, y: res.gridY }).map((cell) => ({
+          ...cell,
+          valid: res.isValid,
+        }))
+      );
     } else {
-      hoverState.visible.value = false;
+      onHoverCells(null);
     }
   };
 
   const processDrop = (absX: number, absY: number) => {
     const res = calculateGridPos(absX, absY);
+    onHoverCells(null);
+    onDragChange(false);
 
-    if (res && res.isValid) {
-      const snapX = gridOriginX + res.gridX * TILE_SIZE;
-      const snapY = gridOriginY + res.gridY * TILE_SIZE;
-
-      globalX.value = withSpring(snapX, { damping: 15, stiffness: 120 });
-      globalY.value = withSpring(snapY, { damping: 15, stiffness: 120 });
-
-      onDropCat(cat.id, { x: res.gridX, y: res.gridY });
-    } else {
-      globalX.value = withSpring(trayX, { damping: 14, stiffness: 100 });
-      globalY.value = withSpring(trayY, { damping: 14, stiffness: 100 });
-
-      onDropCat(cat.id, null);
+    if (res && res.isValid && gridRect) {
+      const local = toLocal(
+        gridRect.x + res.gridX * tileSize,
+        gridRect.y + res.gridY * tileSize,
+        overlayRect
+      );
+      globalX.value = withSpring(local.x, { damping: 15, stiffness: 120 });
+      globalY.value = withSpring(local.y, { damping: 15, stiffness: 120 });
+      onDropCat(cat.id, { x: res.gridX, y: res.gridY }, true);
+      return;
     }
+
+    if (res && !res.isValid) {
+      snapToRest(false);
+      onDropCat(cat.id, { x: res.gridX, y: res.gridY }, false);
+      return;
+    }
+
+    globalX.value = withSpring(tray.x, { damping: 14, stiffness: 100 });
+    globalY.value = withSpring(tray.y, { damping: 14, stiffness: 100 });
+    onDropCat(cat.id, null, true);
+  };
+
+  const handleRotate = () => {
+    onRotate(cat.id);
   };
 
   const panGesture = Gesture.Pan()
+    .minDistance(8)
     .onBegin(() => {
       'worklet';
       draggingCatId.value = cat.id;
-      scale.value = withSpring(1.1);
+      scale.value = withSpring(1.08);
       startDragX.value = globalX.value;
       startDragY.value = globalY.value;
-
+      runOnJS(onDragChange)(true);
       runOnJS(handleAudioMeow)();
     })
     .onUpdate((event) => {
       'worklet';
       globalX.value = startDragX.value + event.translationX;
       globalY.value = startDragY.value + event.translationY;
-
-      // absoluteX and absoluteY reflect exact screen touch point
       runOnJS(updateHoverState)(event.absoluteX, event.absoluteY);
     })
     .onFinalize((event) => {
       'worklet';
       draggingCatId.value = null;
       scale.value = withSpring(1);
-      hoverState.visible.value = false;
-
       runOnJS(processDrop)(event.absoluteX, event.absoluteY);
     });
 
+  const tapGesture = Gesture.Tap().onEnd(() => {
+    'worklet';
+    runOnJS(handleRotate)();
+  });
+
+  const composed = Gesture.Exclusive(panGesture, tapGesture);
+
   useEffect(() => {
     if (draggingCatId.value === cat.id) return;
-
-    const targetX =
-      cat.currentPosition && boardRect
-        ? gridOriginX + cat.currentPosition.x * TILE_SIZE
-        : trayX;
-    const targetY =
-      cat.currentPosition && boardRect
-        ? gridOriginY + cat.currentPosition.y * TILE_SIZE
-        : trayY;
-
-    globalX.value = withSpring(targetX, { damping: 15, stiffness: 120 });
-    globalY.value = withSpring(targetY, { damping: 15, stiffness: 120 });
-  }, [cat.currentPosition, boardRect, trayX, trayY]);
+    snapToRest(ejectedCatId === cat.id);
+  }, [
+    cat.currentPosition?.x,
+    cat.currentPosition?.y,
+    cat.shapeMatrix,
+    gridRect?.x,
+    gridRect?.y,
+    tray.x,
+    tray.y,
+    ejectedCatId,
+    tileSize,
+  ]);
 
   const animatedStyle = useAnimatedStyle(() => ({
-    position: 'absolute',
+    position: 'absolute' as const,
     left: globalX.value,
     top: globalY.value,
     transform: [{ scale: scale.value }],
@@ -216,7 +313,7 @@ const DraggableCatPiece: React.FC<DraggableCatProps> = ({
   }));
 
   return (
-    <GestureDetector gesture={panGesture}>
+    <GestureDetector gesture={composed}>
       <Animated.View
         pointerEvents="auto"
         style={[
@@ -230,6 +327,7 @@ const DraggableCatPiece: React.FC<DraggableCatProps> = ({
           pose={cat.pose}
           width={pieceWidth - 4}
           height={pieceHeight - 4}
+          shapeMatrix={cat.shapeMatrix}
         />
       </Animated.View>
     </GestureDetector>
@@ -239,66 +337,92 @@ const DraggableCatPiece: React.FC<DraggableCatProps> = ({
 export default function GameScreen({ route, navigation }: Props) {
   const { levelId } = route.params;
   const draggingCatId = useSharedValue<string | null>(null);
-  const boardViewRef = useRef<View>(null);
+  const overlayRef = useRef<View>(null);
+  const progressSavedRef = useRef(false);
 
-  const [boardRect, setBoardRect] = useState<BoardRect | null>(null);
-
-  // Dynamic cell hover highlight states
-  const hoverX = useSharedValue(0);
-  const hoverY = useSharedValue(0);
-  const hoverWidth = useSharedValue(TILE_SIZE);
-  const hoverHeight = useSharedValue(TILE_SIZE);
-  const hoverVisible = useSharedValue(false);
-  const hoverIsValid = useSharedValue(true);
-
-  const hoverState: HoverState = {
-    x: hoverX,
-    y: hoverY,
-    width: hoverWidth,
-    height: hoverHeight,
-    visible: hoverVisible,
-    isValid: hoverIsValid,
-  };
+  const [gridRect, setGridRect] = useState<ScreenRect | null>(null);
+  const [overlayRect, setOverlayRect] = useState<ScreenRect | null>(null);
+  const [hoverCells, setHoverCells] = useState<HoverCell[] | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   const {
     level,
     unpackedCats,
     placedCats,
-    movesLeft,
-    score,
     isComplete,
+    jumpOutCount,
+    ejectedCatId,
+    actionNonce,
     placeCat,
     unplaceCat,
+    rotateCat,
+    ejectRandomCat,
     resetLevel,
   } = useGameState(levelId);
 
+  const { recordWin } = useLevelProgress();
+  const { playSound } = useAudio();
   const allCats = useMemo(() => [...unpackedCats, ...placedCats], [unpackedCats, placedCats]);
+  const trayCount = level.availableCats.length;
+  const nextLevelId = getNextLevelId(level.id);
+  const tileSize = Math.min(60, Math.floor((SCREEN_WIDTH - 96) / Math.max(level.gridConfig.cols, 1)));
 
-  const measureBoard = () => {
-    if (boardViewRef.current) {
-      boardViewRef.current.measure((_x, _y, width, height, pageX, pageY) => {
-        if (width > 0 && height > 0) {
-          setBoardRect({ x: pageX, y: pageY, width, height });
-        }
-      });
+  const trayIndexById = useMemo(() => {
+    const map = new Map<string, number>();
+    level.availableCats.forEach((cat, index) => map.set(cat.id, index));
+    return map;
+  }, [level.availableCats]);
+
+  const measureOverlay = useCallback(() => {
+    overlayRef.current?.measureInWindow((x, y, width, height) => {
+      if (width > 0 && height > 0) {
+        setOverlayRect({ x, y, width, height });
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    const handle = setTimeout(measureOverlay, 50);
+    return () => clearTimeout(handle);
+  }, [level.id, tileSize, measureOverlay]);
+
+  useEffect(() => {
+    progressSavedRef.current = false;
+  }, [level.id]);
+
+  useEffect(() => {
+    if (!isComplete || progressSavedRef.current) return;
+    progressSavedRef.current = true;
+    playSound('purr');
+    recordWin(level.id, starsFromJumpOuts(jumpOutCount));
+  }, [isComplete, jumpOutCount, level.id, playSound, recordWin]);
+
+  useEffect(() => {
+    if (isComplete || isDragging || placedCats.length === 0) return;
+    const delay = ejectedCatId ? NEXT_JUMP_MS : FIRST_JUMP_MS;
+    const timer = setTimeout(() => {
+      ejectRandomCat();
+    }, delay);
+    return () => clearTimeout(timer);
+  }, [isComplete, isDragging, placedCats.length, jumpOutCount, actionNonce, ejectRandomCat]);
+
+  const handleDropCat = (catId: string, coords: GridCoordinates | null, valid: boolean) => {
+    if (!coords) {
+      unplaceCat(catId);
+      return;
+    }
+    if (valid) {
+      placeCat(catId, coords);
     }
   };
 
-  const highlightStyle = useAnimatedStyle(() => ({
-    position: 'absolute',
-    left: hoverX.value + BOARD_PADDING,
-    top: hoverY.value + BOARD_PADDING,
-    width: hoverWidth.value,
-    height: hoverHeight.value,
-    opacity: hoverVisible.value ? 1 : 0,
-    backgroundColor: hoverIsValid.value
-      ? 'rgba(76, 175, 80, 0.45)'
-      : 'rgba(244, 67, 54, 0.45)',
-    borderColor: hoverIsValid.value ? '#4CAF50' : '#F44336',
-    borderWidth: 3,
-    borderRadius: 8,
-    zIndex: 15,
-  }));
+  const highlightLocal = (cellX: number, cellY: number) => {
+    if (!gridRect || !overlayRect) return { left: 0, top: 0 };
+    return {
+      left: gridRect.x - overlayRect.x + cellX * tileSize,
+      top: gridRect.y - overlayRect.y + cellY * tileSize,
+    };
+  };
 
   return (
     <ImageBackground
@@ -306,8 +430,11 @@ export default function GameScreen({ route, navigation }: Props) {
       style={styles.backgroundImage}
       resizeMode="cover"
     >
-      <View style={[globalStyles.container, styles.transparentContainer]}>
-        {/* HUD Header */}
+      <View
+        ref={overlayRef}
+        onLayout={measureOverlay}
+        style={styles.screenRoot}
+      >
         <View style={styles.hudBar}>
           <TouchableOpacity
             style={globalStyles.iconButton}
@@ -319,77 +446,119 @@ export default function GameScreen({ route, navigation }: Props) {
           <View style={styles.statsContainer}>
             <Text style={styles.hudText}>Level {level.id}</Text>
             <Text style={styles.hudText}>
-              Moves: {movesLeft}/{level.maxMoves}
+              Packed {placedCats.length}/{level.availableCats.length}
             </Text>
-            <Text style={styles.hudText}>Score: {score}</Text>
           </View>
 
-          <TouchableOpacity
-            style={globalStyles.iconButton}
-            onPress={resetLevel}
-          >
+          <TouchableOpacity style={globalStyles.iconButton} onPress={resetLevel}>
             <Text style={styles.iconText}>🔄</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Level Title */}
         <View style={styles.titleContainer}>
           <Text style={styles.boxTitle}>
-            {isComplete ? '🎉 Level Complete!' : level.title}
+            {isComplete ? 'Level Complete!' : level.title}
           </Text>
+          <Text style={styles.hintText}>Drag into the box • Tap to rotate</Text>
         </View>
 
-        {/* Board Container */}
         <View style={styles.boardArea}>
-          <View
-            ref={boardViewRef}
-            onLayout={measureBoard}
-            style={styles.boardWrapper}
-          >
+          <View style={styles.boardWrapper}>
             <Board
               gridConfig={level.gridConfig}
-              tileSize={TILE_SIZE}
+              tileSize={tileSize}
+              onGridMeasured={setGridRect}
             />
-            {/* Grid Highlight Component Overlay */}
-            <Animated.View pointerEvents="none" style={highlightStyle} />
           </View>
         </View>
 
-        {/* Tray Placeholder Area */}
         <View style={styles.trayContainer} pointerEvents="box-none">
           <Text style={styles.trayTitle}>UNPACKED CATS</Text>
           <View style={styles.catTrayList} pointerEvents="none">
-            {unpackedCats.map((cat) => (
-              <View key={`placeholder-${cat.id}`} style={styles.catTraySlotPlaceholder} />
+            {level.availableCats.map((cat) => (
+              <View
+                key={`placeholder-${cat.id}`}
+                style={[
+                  styles.catTraySlotPlaceholder,
+                  unpackedCats.some((item) => item.id === cat.id) && styles.catTraySlotActive,
+                ]}
+              />
             ))}
           </View>
         </View>
 
-        {/* Floating Absolute Cat Layer */}
-        <View style={[StyleSheet.absoluteFillObject, { zIndex: 20 }]} pointerEvents="box-none">
-          {allCats.map((cat, idx) => (
-            <DraggableCatPiece
-              key={cat.id}
-              index={idx}
-              cat={cat}
-              gridConfig={level.gridConfig}
-              existingCats={placedCats}
-              boardRect={boardRect}
-              hoverState={hoverState}
-              onDropCat={(catId, coords) => {
-                if (coords) {
-                  placeCat(catId, coords);
-                } else {
-                  if (unplaceCat) {
-                    unplaceCat(catId);
-                  }
-                }
-              }}
-              draggingCatId={draggingCatId}
+        {hoverCells?.map((cell) => {
+          const pos = highlightLocal(cell.x, cell.y);
+          return (
+            <View
+              key={`hover-${cell.x}-${cell.y}`}
+              pointerEvents="none"
+              style={[
+                styles.hoverCell,
+                {
+                  left: pos.left,
+                  top: pos.top,
+                  width: tileSize,
+                  height: tileSize,
+                  backgroundColor: cell.valid ? 'rgba(76, 175, 80, 0.45)' : 'rgba(244, 67, 54, 0.45)',
+                  borderColor: cell.valid ? '#4CAF50' : '#F44336',
+                },
+              ]}
             />
-          ))}
-        </View>
+          );
+        })}
+
+        {allCats.map((cat) => (
+          <DraggableCatPiece
+            key={cat.id}
+            cat={cat}
+            trayIndex={trayIndexById.get(cat.id) ?? 0}
+            trayCount={trayCount}
+            tileSize={tileSize}
+            gridConfig={level.gridConfig}
+            existingCats={placedCats}
+            gridRect={gridRect}
+            overlayRect={overlayRect}
+            onHoverCells={setHoverCells}
+            onDropCat={handleDropCat}
+            onRotate={rotateCat}
+            onDragChange={setIsDragging}
+            draggingCatId={draggingCatId}
+            ejectedCatId={ejectedCatId}
+          />
+        ))}
       </View>
+
+      <Modal visible={isComplete} transparent animationType="fade">
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>All cats packed!</Text>
+            <Text style={styles.modalStars}>
+              {'★'.repeat(starsFromJumpOuts(jumpOutCount))}
+              {'☆'.repeat(3 - starsFromJumpOuts(jumpOutCount))}
+            </Text>
+            <Text style={styles.modalBody}>
+              {jumpOutCount === 0
+                ? 'Nobody jumped out. Perfect packing.'
+                : `${jumpOutCount} cat${jumpOutCount === 1 ? '' : 's'} jumped out along the way.`}
+            </Text>
+            {nextLevelId != null && (
+              <GameButton
+                title="NEXT LEVEL"
+                variant="primary"
+                style={{ width: '100%', minWidth: 220 }}
+                onPress={() => navigation.replace('Game', { levelId: nextLevelId })}
+              />
+            )}
+            <GameButton
+              title="LEVEL SELECT"
+              variant="secondary"
+              style={{ width: '100%', minWidth: 220 }}
+              onPress={() => navigation.navigate('LevelSelect')}
+            />
+          </View>
+        </View>
+      </Modal>
     </ImageBackground>
   );
 }
@@ -400,8 +569,8 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  transparentContainer: {
-    backgroundColor: 'transparent',
+  screenRoot: {
+    flex: 1,
     position: 'relative',
   },
   hudBar: {
@@ -442,6 +611,12 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: COLORS.textDark,
   },
+  hintText: {
+    fontFamily: 'Fredoka-Regular',
+    fontSize: 12,
+    color: COLORS.textMuted,
+    marginTop: 4,
+  },
   boardArea: {
     flex: 1,
     width: '100%',
@@ -472,18 +647,21 @@ const styles = StyleSheet.create({
   catTrayList: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: 8,
     justifyContent: 'center',
-    height: 60,
+    minHeight: 60,
   },
   catTraySlotPlaceholder: {
-    width: TILE_SIZE,
-    height: TILE_SIZE,
+    width: 56,
+    height: 56,
     backgroundColor: COLORS.cardboardDark,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: COLORS.cardboardBorder,
-    opacity: 0.4,
+    opacity: 0.25,
+  },
+  catTraySlotActive: {
+    opacity: 0.45,
   },
   catGlobalWrapper: {
     position: 'absolute',
@@ -491,5 +669,46 @@ const styles = StyleSheet.create({
     left: 0,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  hoverCell: {
+    position: 'absolute',
+    borderWidth: 3,
+    borderRadius: 8,
+    zIndex: 8,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(74, 62, 61, 0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 340,
+    backgroundColor: COLORS.primaryBg,
+    borderRadius: 24,
+    borderWidth: 4,
+    borderColor: COLORS.cardboardDark,
+    padding: 24,
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontFamily: 'Fredoka-Bold',
+    fontSize: 24,
+    color: COLORS.textDark,
+    textAlign: 'center',
+  },
+  modalStars: {
+    fontSize: 28,
+    marginVertical: 8,
+    color: '#E6A817',
+  },
+  modalBody: {
+    fontFamily: 'Fredoka-Regular',
+    fontSize: 14,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+    marginBottom: 12,
   },
 });

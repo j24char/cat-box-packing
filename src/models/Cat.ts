@@ -29,7 +29,17 @@ export const CAT_SHAPES: Record<CatPose, number[][]> = {
   kitten: [[1]],
 };
 
-export const getCatShape = (pose: CatPose): number[][] => CAT_SHAPES[pose] ?? CAT_SHAPES.kitten;
+export const cloneShapeMatrix = (matrix: number[][]): number[][] =>
+  matrix.map((row) => [...row]);
+
+export const getCatShape = (pose: CatPose): number[][] =>
+  cloneShapeMatrix(CAT_SHAPES[pose] ?? CAT_SHAPES.kitten);
+
+export const cloneCatPiece = (cat: CatPiece): CatPiece => ({
+  ...cat,
+  shapeMatrix: cloneShapeMatrix(cat.shapeMatrix),
+  currentPosition: cat.currentPosition ? { ...cat.currentPosition } : undefined,
+});
 
 export const getCatCellCount = (shapeMatrix: number[][]): number =>
   shapeMatrix.reduce((total, row) => total + row.reduce((rowTotal, cell) => rowTotal + (cell ? 1 : 0), 0), 0);

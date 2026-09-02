@@ -1,53 +1,46 @@
 // src/hooks/useGameState.ts
 
-import { useState, useCallback } from 'react';
-import { CatPiece, GridCoordinates } from '../models/Cat';
-import { Level, SAMPLE_LEVELS } from '../models/Level';
-import { isValidPlacement, isLevelComplete } from '../utils/gridSolver';
-
-export interface GameState {
-  currentLevel: Level;
-  unpackedCats: CatPiece[];
-  placedCats: CatPiece[];
-  movesLeft: number;
-  score: number;
-  isComplete: boolean;
-}
+import { useState, useCallback, useEffect } from 'react';
+import { CatPiece, GridCoordinates, cloneCatPiece } from '../models/Cat';
+import { Level, getLevelById } from '../models/Level';
+import { isValidPlacement, isLevelComplete, rotateMatrix } from '../utils/gridSolver';
 
 export const useGameState = (initialLevelId: number = 1) => {
-  const getLevelById = (id: number): Level =>
-    SAMPLE_LEVELS.find((lvl) => lvl.id === id) || SAMPLE_LEVELS[0];
-
   const [level, setLevel] = useState<Level>(() => getLevelById(initialLevelId));
-  const [unpackedCats, setUnpackedCats] = useState<CatPiece[]>(level.availableCats);
+  const [unpackedCats, setUnpackedCats] = useState<CatPiece[]>(() =>
+    getLevelById(initialLevelId).availableCats.map(cloneCatPiece)
+  );
   const [placedCats, setPlacedCats] = useState<CatPiece[]>([]);
-  const [history, setHistory] = useState<CatPiece[][]>([]);
-  const [movesLeft, setMovesLeft] = useState<number>(level.maxMoves);
-  const [score, setScore] = useState<number>(0);
   const [isComplete, setIsComplete] = useState<boolean>(false);
+  const [jumpOutCount, setJumpOutCount] = useState<number>(0);
+  const [ejectedCatId, setEjectedCatId] = useState<string | null>(null);
+  const [actionNonce, setActionNonce] = useState<number>(0);
 
-  // Initialize or switch to a new level
+  const bumpAction = () => setActionNonce((value) => value + 1);
+
   const loadLevel = useCallback((levelId: number) => {
     const newLevel = getLevelById(levelId);
     setLevel(newLevel);
-    setUnpackedCats(newLevel.availableCats);
+    setUnpackedCats(newLevel.availableCats.map(cloneCatPiece));
     setPlacedCats([]);
-    setHistory([]);
-    setMovesLeft(newLevel.maxMoves);
-    setScore(0);
     setIsComplete(false);
+    setJumpOutCount(0);
+    setEjectedCatId(null);
+    bumpAction();
   }, []);
 
-  // Place or move a cat piece onto the grid
+  useEffect(() => {
+    loadLevel(initialLevelId);
+  }, [initialLevelId, loadLevel]);
+
+  const findCat = (catId: string, unpacked: CatPiece[], placed: CatPiece[]) =>
+    unpacked.find((c) => c.id === catId) || placed.find((c) => c.id === catId);
+
   const placeCat = useCallback(
     (catId: string, targetCoords: GridCoordinates) => {
-      if (movesLeft <= 0 || isComplete) return false;
+      if (isComplete) return false;
 
-      // Locate cat in either unpacked tray or active board
-      const cat =
-        unpackedCats.find((c) => c.id === catId) ||
-        placedCats.find((c) => c.id === catId);
-
+      const cat = findCat(catId, unpackedCats, placedCats);
       if (!cat) return false;
 
       const updatedCat: CatPiece = {
@@ -55,7 +48,6 @@ export const useGameState = (initialLevelId: number = 1) => {
         currentPosition: targetCoords,
       };
 
-      // Validate collision & bounds
       const otherPlacedCats = placedCats.filter((c) => c.id !== catId);
       const valid = isValidPlacement(
         updatedCat,
@@ -66,17 +58,14 @@ export const useGameState = (initialLevelId: number = 1) => {
 
       if (!valid) return false;
 
-      // Save state for undo
-      setHistory((prev) => [...prev, placedCats]);
-
       const newPlacedCats = [...otherPlacedCats, updatedCat];
       const newUnpackedCats = unpackedCats.filter((c) => c.id !== catId);
 
       setPlacedCats(newPlacedCats);
       setUnpackedCats(newUnpackedCats);
-      setMovesLeft((prev) => Math.max(0, prev - 1));
+      setEjectedCatId(null);
+      bumpAction();
 
-      // Check win condition
       const completed = isLevelComplete(
         level.availableCats,
         newPlacedCats,
@@ -85,29 +74,82 @@ export const useGameState = (initialLevelId: number = 1) => {
 
       if (completed) {
         setIsComplete(true);
-        setScore(level.targetScore + movesLeft * 100);
       }
 
       return true;
     },
-    [unpackedCats, placedCats, movesLeft, isComplete, level]
+    [unpackedCats, placedCats, isComplete, level]
   );
 
-  // Undo the last move
-  const undoMove = useCallback(() => {
-    if (history.length === 0 || isComplete) return;
+  const unplaceCat = useCallback(
+    (catId: string, options?: { ejected?: boolean }) => {
+      const cat = placedCats.find((c) => c.id === catId);
+      if (!cat) return false;
 
-    const previousPlacedState = history[history.length - 1];
-    setHistory((prev) => prev.slice(0, -1));
-    setPlacedCats(previousPlacedState);
+      const nextPlacedCats = placedCats.filter((c) => c.id !== catId);
+      const nextUnpackedCats = [
+        ...unpackedCats,
+        { ...cat, currentPosition: undefined },
+      ];
 
-    // Recalculate remaining unpacked cats
-    const placedIds = new Set(previousPlacedState.map((c) => c.id));
-    setUnpackedCats(level.availableCats.filter((c) => !placedIds.has(c.id)));
-    setMovesLeft((prev) => prev + 1);
-  }, [history, isComplete, level]);
+      setPlacedCats(nextPlacedCats);
+      setUnpackedCats(nextUnpackedCats);
+      setIsComplete(false);
 
-  // Restart current level
+      if (options?.ejected) {
+        setJumpOutCount((count) => count + 1);
+        setEjectedCatId(catId);
+      } else {
+        setEjectedCatId(null);
+      }
+
+      bumpAction();
+      return true;
+    },
+    [placedCats, unpackedCats]
+  );
+
+  const rotateCat = useCallback(
+    (catId: string) => {
+      if (isComplete) return false;
+
+      const unpacked = unpackedCats.find((c) => c.id === catId);
+      if (unpacked) {
+        setUnpackedCats((prev) =>
+          prev.map((c) =>
+            c.id === catId ? { ...c, shapeMatrix: rotateMatrix(c.shapeMatrix) } : c
+          )
+        );
+        bumpAction();
+        return true;
+      }
+
+      const placed = placedCats.find((c) => c.id === catId);
+      if (!placed || !placed.currentPosition) return false;
+
+      const rotated: CatPiece = {
+        ...placed,
+        shapeMatrix: rotateMatrix(placed.shapeMatrix),
+      };
+      const others = placedCats.filter((c) => c.id !== catId);
+
+      if (!isValidPlacement(rotated, placed.currentPosition, level.gridConfig, others)) {
+        return false;
+      }
+
+      setPlacedCats([...others, rotated]);
+      bumpAction();
+      return true;
+    },
+    [unpackedCats, placedCats, isComplete, level]
+  );
+
+  const ejectRandomCat = useCallback(() => {
+    if (isComplete || placedCats.length === 0) return false;
+    const pick = placedCats[Math.floor(Math.random() * placedCats.length)];
+    return unplaceCat(pick.id, { ejected: true });
+  }, [isComplete, placedCats, unplaceCat]);
+
   const resetLevel = useCallback(() => {
     loadLevel(level.id);
   }, [level.id, loadLevel]);
@@ -116,12 +158,15 @@ export const useGameState = (initialLevelId: number = 1) => {
     level,
     unpackedCats,
     placedCats,
-    movesLeft,
-    score,
     isComplete,
+    jumpOutCount,
+    ejectedCatId,
+    actionNonce,
     loadLevel,
     placeCat,
-    undoMove,
+    unplaceCat,
+    rotateCat,
+    ejectRandomCat,
     resetLevel,
   };
 };

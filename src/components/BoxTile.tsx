@@ -1,8 +1,15 @@
 // src/components/BoxTile.tsx
 
-import React from 'react';
+import React, { useRef } from 'react';
 import { View, StyleSheet, ViewStyle } from 'react-native';
 import { COLORS } from '../constants/colors';
+
+interface GridMeasurement {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
 
 interface BoxTileProps {
   rows: number;
@@ -11,6 +18,7 @@ interface BoxTileProps {
   tileSize?: number;
   children?: React.ReactNode;
   style?: ViewStyle;
+  onGridMeasured?: (measurements: GridMeasurement) => void;
 }
 
 export const BoxTile: React.FC<BoxTileProps> = ({
@@ -20,9 +28,19 @@ export const BoxTile: React.FC<BoxTileProps> = ({
   tileSize = 60,
   children,
   style,
+  onGridMeasured,
 }) => {
+  const gridRef = useRef<View>(null);
   const containerWidth = cols * tileSize + 24;
   const containerHeight = rows * tileSize + 24;
+
+  const measureGrid = () => {
+    gridRef.current?.measureInWindow((x, y, width, height) => {
+      if (width > 0 && height > 0) {
+        onGridMeasured?.({ x, y, width, height });
+      }
+    });
+  };
 
   return (
     <View style={[styles.boxContainer, { width: containerWidth, height: containerHeight }, style]}>
@@ -33,6 +51,7 @@ export const BoxTile: React.FC<BoxTileProps> = ({
       
       {/* Inner Box Interior / Grid Container */}
       <View style={styles.gridContainer}>
+      <View ref={gridRef} collapsable={false} onLayout={measureGrid}>
         {Array.from({ length: rows }).map((_, rIdx) => (
           <View key={`row-${rIdx}`} style={styles.row}>
             {Array.from({ length: cols }).map((_, cIdx) => {
@@ -54,6 +73,7 @@ export const BoxTile: React.FC<BoxTileProps> = ({
 
         {/* Absolute Children Layer (Cat Pieces Grid Overlay) */}
         {children && <View style={StyleSheet.absoluteFill}>{children}</View>}
+      </View>
       </View>
 
       {/* Bottom Left Cardboard Flap */}

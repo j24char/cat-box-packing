@@ -11,6 +11,7 @@ interface CatSpriteProps {
   size?: number;
   width?: number;
   height?: number;
+  shapeMatrix?: number[][];
   style?: ViewStyle;
 }
 
@@ -31,12 +32,18 @@ export const CatSprite: React.FC<CatSpriteProps> = ({
   size = 60,
   width,
   height,
+  shapeMatrix,
   style,
 }) => {
   const colors = BREED_COLORS[breed] || BREED_COLORS.orange;
   const canvasWidth = width ?? size;
   const canvasHeight = height ?? size;
   const scale = Math.min(canvasWidth, canvasHeight) / 100;
+  const matrix = shapeMatrix ?? getPoseMatrix(pose);
+  const rows = matrix.length || 1;
+  const cols = matrix[0]?.length || 1;
+  const cellWidth = canvasWidth / cols;
+  const cellHeight = canvasHeight / rows;
 
   const getPosePaths = () => {
     switch (pose) {
@@ -152,6 +159,24 @@ export const CatSprite: React.FC<CatSpriteProps> = ({
   };
 
   const { bodyPath, ears, tail } = getPosePaths();
+  const cellPaths = [] as any[];
+
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      if (matrix[row]?.[col] !== 1) continue;
+
+      const cellRect = Skia.RRectXY({
+        x: col * cellWidth + 2,
+        y: row * cellHeight + 2,
+        width: Math.max(cellWidth - 4, 2),
+        height: Math.max(cellHeight - 4, 2),
+      }, 10, 10);
+
+      const tilePath = Skia.Path.Make();
+      tilePath.addRRect(cellRect);
+      cellPaths.push({ tilePath, row, col });
+    }
+  }
 
   return (
     <Canvas style={[{ width: canvasWidth, height: canvasHeight }, style]}>
@@ -163,15 +188,44 @@ export const CatSprite: React.FC<CatSpriteProps> = ({
           strokeWidth={6 * scale}
         />
       )}
-      <Path path={bodyPath} color={colors.body} />
-      {ears.map((earPath, index) => (
-        <Path key={index} path={earPath} color={colors.body} />
-      ))}
-      {ears.map((earPath, index) => (
-        <Path key={`inner-${index}`} path={earPath} color={colors.innerEar} opacity={0.6} />
-      ))}
+      {cellPaths.length > 0 ? (
+        <>
+          {cellPaths.map(({ tilePath }, index) => (
+            <Path key={`cell-${index}`} path={tilePath} color={colors.body} opacity={0.96} />
+          ))}
+          {cellPaths.map(({ tilePath }, index) => (
+            <Path key={`cell-inner-${index}`} path={tilePath} color={colors.innerEar} opacity={0.22} />
+          ))}
+        </>
+      ) : (
+        <>
+          <Path path={bodyPath} color={colors.body} />
+          {ears.map((earPath, index) => (
+            <Path key={index} path={earPath} color={colors.body} />
+          ))}
+          {ears.map((earPath, index) => (
+            <Path key={`inner-${index}`} path={earPath} color={colors.innerEar} opacity={0.6} />
+          ))}
+        </>
+      )}
     </Canvas>
   );
+};
+
+const getPoseMatrix = (pose: CatPose): number[][] => {
+  switch (pose) {
+    case 'curl':
+      return [[1, 1], [1, 1]];
+    case 'stretch':
+      return [[1, 1, 1], [1, 0, 0]];
+    case 'sitting':
+      return [[1, 1]];
+    case 'loaf':
+      return [[1, 1, 1, 1]];
+    case 'kitten':
+    default:
+      return [[1]];
+  }
 };
 
 export default CatSprite;

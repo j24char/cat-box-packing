@@ -1,6 +1,6 @@
 // src/components/Board.tsx
 
-import React, { useRef } from 'react';
+import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { BoxTile } from './BoxTile';
 import { BoxGridConfig } from '../models/Level';
@@ -8,7 +8,7 @@ import { BoxGridConfig } from '../models/Level';
 interface BoardProps {
   gridConfig: BoxGridConfig;
   tileSize?: number;
-  onLayoutMeasured?: (measurements: {
+  onGridMeasured?: (measurements: {
     x: number;
     y: number;
     width: number;
@@ -19,27 +19,16 @@ interface BoardProps {
 export const Board: React.FC<BoardProps> = ({
   gridConfig,
   tileSize = 60,
-  onLayoutMeasured,
+  onGridMeasured,
 }) => {
-  const containerRef = useRef<View>(null);
-
-  const handleLayout = () => {
-    containerRef.current?.measureInWindow((x, y, width, height) => {
-      onLayoutMeasured?.({ x, y, width, height });
-    });
-  };
-
   return (
-    <View
-      ref={containerRef}
-      style={styles.container}
-      onLayout={handleLayout}
-    >
+    <View style={styles.container}>
       <BoxTile
         rows={gridConfig.rows}
         cols={gridConfig.cols}
         mask={gridConfig.mask}
         tileSize={tileSize}
+        onGridMeasured={onGridMeasured}
       />
     </View>
   );
