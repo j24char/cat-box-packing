@@ -15,6 +15,8 @@ export const useGameState = (initialLevelId: number = 1) => {
   const [jumpOutCount, setJumpOutCount] = useState<number>(0);
   const [ejectedCatId, setEjectedCatId] = useState<string | null>(null);
   const [actionNonce, setActionNonce] = useState<number>(0);
+  const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
+  const [mouseActive, setMouseActive] = useState<boolean>(false);
 
   const bumpAction = () => setActionNonce((value) => value + 1);
 
@@ -26,12 +28,23 @@ export const useGameState = (initialLevelId: number = 1) => {
     setIsComplete(false);
     setJumpOutCount(0);
     setEjectedCatId(null);
+    setElapsedSeconds(0);
+    setMouseActive(false);
     bumpAction();
   }, []);
 
   useEffect(() => {
     loadLevel(initialLevelId);
   }, [initialLevelId, loadLevel]);
+
+  // Timer: increment elapsed seconds while playing
+  useEffect(() => {
+    if (isComplete) return;
+    const timer = setInterval(() => {
+      setElapsedSeconds((prev) => prev + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [isComplete, level.id]);
 
   const findCat = (catId: string, unpacked: CatPiece[], placed: CatPiece[]) =>
     unpacked.find((c) => c.id === catId) || placed.find((c) => c.id === catId);
@@ -113,6 +126,14 @@ export const useGameState = (initialLevelId: number = 1) => {
     (catId: string) => {
       if (isComplete) return false;
 
+      const findCatInLists = () =>
+        unpackedCats.find((c) => c.id === catId) || placedCats.find((c) => c.id === catId);
+      const cat = findCatInLists();
+      if (!cat) return false;
+
+      // Only Stretching and Loaf cats can be rotated
+      if (cat.pose !== 'stretch' && cat.pose !== 'loaf') return false;
+
       const unpacked = unpackedCats.find((c) => c.id === catId);
       if (unpacked) {
         setUnpackedCats((prev) =>
@@ -144,11 +165,67 @@ export const useGameState = (initialLevelId: number = 1) => {
     [unpackedCats, placedCats, isComplete, level]
   );
 
+  // Check if a cat is adjacent to a catnip toy (disables boredom)
+  const isCatAdjacentToCatnip = useCallback(
+    (cat: CatPiece) => {
+      if (!cat.currentPosition) return false;
+      const catnipCells = level.gridConfig.obstacles?.filter((ob) => ob.type === 'catnip') ?? [];
+
+      for (let r = 0; r < cat.shapeMatrix.length; r++) {
+        for (let c = 0; c < cat.shapeMatrix[r].length; c++) {
+          if (cat.shapeMatrix[r][c] !== 1) continue;
+          const boardX = cat.currentPosition.x + c;
+          const boardY = cat.currentPosition.y + r;
+
+          for (const nip of catnipCells) {
+            const isAdjacent = Math.abs(boardX - nip.x) + Math.abs(boardY - nip.y) === 1;
+            if (isAdjacent) return true;
+          }
+        }
+      }
+      return false;
+    },
+    [level.gridConfig.obstacles]
+  );
+
   const ejectRandomCat = useCallback(() => {
     if (isComplete || placedCats.length === 0) return false;
-    const pick = placedCats[Math.floor(Math.random() * placedCats.length)];
+
+    // Only awake cats that are NOT adjacent to catnip can be ejected
+    const eligibleCats = placedCats.filter(
+      (c) => c.isAwake && !isCatAdjacentToCatnip(c)
+    );
+    if (eligibleCats.length === 0) return false;
+
+    const pick = eligibleCats[Math.floor(Math.random() * eligibleCats.length)];
     return unplaceCat(pick.id, { ejected: true });
-  }, [isComplete, placedCats, unplaceCat]);
+  }, [isComplete, placedCats, unplaceCat, isCatAdjacentToCatnip]);
+
+  // Mouse distraction: all awake cats jump out of the box
+  const triggerMouseDistraction = useCallback(() => {
+    if (isComplete || placedCats.length === 0) return false;
+    setMouseActive(true);
+
+    // Eject all awake placed cats
+    const awakePlaced = placedCats.filter((c) => c.isAwake);
+    if (awakePlaced.length > 0) {
+      const nextPlacedCats = placedCats.filter((c) => !c.isAwake);
+      const nextUnpackedCats = [
+        ...unpackedCats,
+        ...awakePlaced.map((c) => ({ ...c, currentPosition: undefined })),
+      ];
+      setPlacedCats(nextPlacedCats);
+      setUnpackedCats(nextUnpackedCats);
+      setIsComplete(false);
+      setJumpOutCount((count) => count + awakePlaced.length);
+      setEjectedCatId(awakePlaced[0].id);
+      bumpAction();
+    }
+
+    // Deactivate mouse after a short delay
+    setTimeout(() => setMouseActive(false), 1500);
+    return true;
+  }, [isComplete, placedCats, unpackedCats]);
 
   const resetLevel = useCallback(() => {
     loadLevel(level.id);
@@ -162,11 +239,14 @@ export const useGameState = (initialLevelId: number = 1) => {
     jumpOutCount,
     ejectedCatId,
     actionNonce,
+    elapsedSeconds,
+    mouseActive,
     loadLevel,
     placeCat,
     unplaceCat,
     rotateCat,
     ejectRandomCat,
+    triggerMouseDistraction,
     resetLevel,
   };
 };

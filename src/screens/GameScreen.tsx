@@ -28,7 +28,7 @@ import { useAudio } from '../hooks/useAudio';
 import { useLevelProgress } from '../hooks/useLevelProgress';
 import { COLORS, globalStyles } from '../constants/theme';
 import { CatPiece, GridCoordinates, getCatShapeSize } from '../models/Cat';
-import { BoxGridConfig, getNextLevelId, starsFromJumpOuts } from '../models/Level';
+import { BoxGridConfig, getNextLevelId, starsFromTime } from '../models/Level';
 import { getOccupiedCells, isValidPlacement } from '../utils/gridSolver';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -353,10 +353,13 @@ export default function GameScreen({ route, navigation }: Props) {
     jumpOutCount,
     ejectedCatId,
     actionNonce,
+    elapsedSeconds,
+    mouseActive,
     placeCat,
     unplaceCat,
     rotateCat,
     ejectRandomCat,
+    triggerMouseDistraction,
     resetLevel,
   } = useGameState(levelId);
 
@@ -394,8 +397,8 @@ export default function GameScreen({ route, navigation }: Props) {
     if (!isComplete || progressSavedRef.current) return;
     progressSavedRef.current = true;
     playSound('purr');
-    recordWin(level.id, starsFromJumpOuts(jumpOutCount));
-  }, [isComplete, jumpOutCount, level.id, playSound, recordWin]);
+    recordWin(level.id, starsFromTime(elapsedSeconds, level.targetTime));
+  }, [isComplete, elapsedSeconds, level.id, level.targetTime, playSound, recordWin]);
 
   useEffect(() => {
     if (isComplete || isDragging || placedCats.length === 0) return;
@@ -405,6 +408,15 @@ export default function GameScreen({ route, navigation }: Props) {
     }, delay);
     return () => clearTimeout(timer);
   }, [isComplete, isDragging, placedCats.length, jumpOutCount, actionNonce, ejectRandomCat]);
+
+  // Mouse distraction: randomly triggers while playing
+  useEffect(() => {
+    if (isComplete || isDragging || placedCats.length === 0) return;
+    const mouseTimer = setTimeout(() => {
+      triggerMouseDistraction();
+    }, 30000 + Math.random() * 30000); // Random between 30-60 seconds
+    return () => clearTimeout(mouseTimer);
+  }, [isComplete, isDragging, placedCats.length, actionNonce, triggerMouseDistraction]);
 
   const handleDropCat = (catId: string, coords: GridCoordinates | null, valid: boolean) => {
     if (!coords) {
@@ -438,7 +450,7 @@ export default function GameScreen({ route, navigation }: Props) {
         <View style={styles.hudBar}>
           <TouchableOpacity
             style={globalStyles.iconButton}
-            onPress={() => navigation.navigate('LevelSelect')}
+            onPress={() => navigation.navigate('Home')}
           >
             <Text style={styles.iconText}>🏠</Text>
           </TouchableOpacity>
@@ -447,6 +459,9 @@ export default function GameScreen({ route, navigation }: Props) {
             <Text style={styles.hudText}>Level {level.id}</Text>
             <Text style={styles.hudText}>
               Packed {placedCats.length}/{level.availableCats.length}
+            </Text>
+            <Text style={styles.hudText}>
+              ⏱ {elapsedSeconds}s
             </Text>
           </View>
 
@@ -461,6 +476,12 @@ export default function GameScreen({ route, navigation }: Props) {
           </Text>
           <Text style={styles.hintText}>Drag into the box • Tap to rotate</Text>
         </View>
+
+        {mouseActive && (
+          <View style={styles.mouseOverlay} pointerEvents="none">
+            <Text style={styles.mouseText}>🐭 A mouse! Cats scatter!</Text>
+          </View>
+        )}
 
         <View style={styles.boardArea}>
           <View style={styles.boardWrapper}>
@@ -534,8 +555,11 @@ export default function GameScreen({ route, navigation }: Props) {
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>All cats packed!</Text>
             <Text style={styles.modalStars}>
-              {'★'.repeat(starsFromJumpOuts(jumpOutCount))}
-              {'☆'.repeat(3 - starsFromJumpOuts(jumpOutCount))}
+              {'★'.repeat(starsFromTime(elapsedSeconds, level.targetTime))}
+              {'☆'.repeat(3 - starsFromTime(elapsedSeconds, level.targetTime))}
+            </Text>
+            <Text style={styles.modalBody}>
+              Time: {elapsedSeconds}s / Target: {level.targetTime}s
             </Text>
             <Text style={styles.modalBody}>
               {jumpOutCount === 0
@@ -554,7 +578,10 @@ export default function GameScreen({ route, navigation }: Props) {
               title="LEVEL SELECT"
               variant="secondary"
               style={{ width: '100%', minWidth: 220 }}
-              onPress={() => navigation.navigate('LevelSelect')}
+              onPress={() => {
+                resetLevel();
+                navigation.navigate('LevelSelect');
+              }}
             />
           </View>
         </View>
@@ -675,6 +702,21 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderRadius: 8,
     zIndex: 8,
+  },
+  mouseOverlay: {
+    position: 'absolute',
+    top: 120,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(244, 67, 54, 0.85)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
+    zIndex: 20,
+  },
+  mouseText: {
+    fontFamily: 'Fredoka-Bold',
+    fontSize: 16,
+    color: '#FFFFFF',
   },
   modalBackdrop: {
     flex: 1,

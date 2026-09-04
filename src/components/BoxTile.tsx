@@ -3,6 +3,7 @@
 import React, { useRef } from 'react';
 import { View, StyleSheet, ViewStyle } from 'react-native';
 import { COLORS } from '../constants/colors';
+import { Obstacle } from '../models/Level';
 
 interface GridMeasurement {
   x: number;
@@ -15,6 +16,7 @@ interface BoxTileProps {
   rows: number;
   cols: number;
   mask?: number[][];
+  obstacles?: Obstacle[];
   tileSize?: number;
   children?: React.ReactNode;
   style?: ViewStyle;
@@ -25,6 +27,7 @@ export const BoxTile: React.FC<BoxTileProps> = ({
   rows,
   cols,
   mask,
+  obstacles,
   tileSize = 60,
   children,
   style,
@@ -56,6 +59,7 @@ export const BoxTile: React.FC<BoxTileProps> = ({
           <View key={`row-${rIdx}`} style={styles.row}>
             {Array.from({ length: cols }).map((_, cIdx) => {
               const isPlayable = mask ? mask[rIdx]?.[cIdx] !== 0 : true;
+              const obstacle = obstacles?.find((ob) => ob.x === cIdx && ob.y === rIdx);
 
               return (
                 <View
@@ -65,7 +69,16 @@ export const BoxTile: React.FC<BoxTileProps> = ({
                     { width: tileSize, height: tileSize },
                     !isPlayable && styles.blockedCell,
                   ]}
-                />
+                >
+                  {isPlayable && obstacle && (
+                    <View
+                      style={[
+                        styles.obstacle,
+                        obstacle.type === 'catnip' ? styles.catnip : styles.cucumber,
+                      ]}
+                    />
+                  )}
+                </View>
               );
             })}
           </View>
@@ -113,6 +126,25 @@ const styles = StyleSheet.create({
   blockedCell: {
     backgroundColor: COLORS.cardboardDark,
     borderColor: COLORS.cardboardBorder,
+  },
+  obstacle: {
+    position: 'absolute',
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignSelf: 'center',
+  },
+  catnip: {
+    backgroundColor: '#4A90D9',
+    borderWidth: 2,
+    borderColor: '#2C5F8A',
+  },
+  cucumber: {
+    backgroundColor: '#4CAF50',
+    borderWidth: 2,
+    borderColor: '#2E7D32',
+    borderRadius: 12,
+    transform: [{ rotate: '45deg' }],
   },
   flap: {
     position: 'absolute',

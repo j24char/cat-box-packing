@@ -1,3 +1,5 @@
+// src/screens/LevelSelectScreen.tsx
+
 import React, { useMemo } from 'react';
 import {
   View,
@@ -62,6 +64,7 @@ export default function LevelSelectScreen({ navigation }: Props) {
         </View>
 
         <ScrollView
+          style={styles.scrollView}
           contentContainerStyle={[styles.listContainer, { height: contentHeight }]}
           showsVerticalScrollIndicator={false}
         >
@@ -153,6 +156,7 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   transparentContainer: {
+    flex: 1,
     backgroundColor: 'transparent',
     justifyContent: 'flex-start',
   },
@@ -169,6 +173,10 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: COLORS.textDark,
+  },
+  scrollView: {
+    flex: 1,
+    width: '100%',
   },
   listContainer: {
     width: '100%',

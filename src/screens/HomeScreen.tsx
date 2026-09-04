@@ -6,8 +6,8 @@ import {
   Text,
   StyleSheet,
   ImageBackground,
-  SafeAreaView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { GameButton } from '../components/GameButton';
 import { COLORS, FONTS } from '../constants/theme';
@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
   },
   titleContainer: {
     alignItems: 'center',
-    marginTop: 40,
+    marginTop: 500,
     position: 'relative',
   },
   titleText: {

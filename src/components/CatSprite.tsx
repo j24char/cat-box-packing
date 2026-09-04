@@ -1,8 +1,8 @@
 // src/components/CatSprite.tsx
 
 import React from 'react';
-import { StyleSheet, ViewStyle } from 'react-native';
-import { Canvas, Path, Skia } from '@shopify/react-native-skia';
+import { ViewStyle } from 'react-native';
+import { Canvas, Path, RoundedRect, rect, rrect } from '@shopify/react-native-skia';
 import { CatBreed, CatPose } from '../models/Cat';
 
 interface CatSpriteProps {
@@ -48,133 +48,99 @@ export const CatSprite: React.FC<CatSpriteProps> = ({
   const getPosePaths = () => {
     switch (pose) {
       case 'curl': {
-        const bodyPath = Skia.Path.Make();
-        bodyPath.addCircle(50, 50, 38);
-
-        const ear1 = Skia.Path.Make();
-        ear1.moveTo(25, 25);
-        ear1.lineTo(35, 12);
-        ear1.lineTo(45, 25);
-        ear1.close();
-
-        const ear2 = Skia.Path.Make();
-        ear2.moveTo(55, 25);
-        ear2.lineTo(65, 12);
-        ear2.lineTo(75, 25);
-        ear2.close();
-
-        return { bodyPath, ears: [ear1, ear2], tail: null };
+        return {
+          bodyPath: 'M 50,50 m -38,0 a 38,38 0 1,0 76,0 a 38,38 0 1,0 -76,0 Z',
+          ears: [
+            'M 25 25 L 35 12 L 45 25 Z',
+            'M 55 25 L 65 12 L 75 25 Z',
+          ],
+          tail: null,
+          loafRRect: null,
+        };
       }
 
       case 'stretch': {
-        const bodyPath = Skia.Path.Make();
-        bodyPath.addOval({ x: 15, y: 35, width: 70, height: 30 });
-
-        const ear1 = Skia.Path.Make();
-        ear1.moveTo(70, 35);
-        ear1.lineTo(78, 20);
-        ear1.lineTo(84, 35);
-        ear1.close();
-
-        const ear2 = Skia.Path.Make();
-        ear2.moveTo(55, 35);
-        ear2.lineTo(62, 20);
-        ear2.lineTo(68, 35);
-        ear2.close();
-
-        const tail = Skia.Path.Make();
-        tail.moveTo(18, 50);
-        tail.quadTo(5, 45, 8, 25);
-
-        return { bodyPath, ears: [ear1, ear2], tail };
+        return {
+          bodyPath: 'M 15 50 A 35 15 0 1 0 85 50 A 35 15 0 1 0 15 50 Z',
+          ears: [
+            'M 70 35 L 78 20 L 84 35 Z',
+            'M 55 35 L 62 20 L 68 35 Z',
+          ],
+          tail: 'M 18 50 Q 5 45 8 25',
+          loafRRect: null,
+        };
       }
 
       case 'sitting': {
-        const bodyPath = Skia.Path.Make();
-        bodyPath.addOval({ x: 30, y: 40, width: 40, height: 50 });
-
-        const headPath = Skia.Path.Make();
-        headPath.addCircle(50, 32, 22);
-        bodyPath.addPath(headPath);
-
-        const ear1 = Skia.Path.Make();
-        ear1.moveTo(32, 22);
-        ear1.lineTo(38, 5);
-        ear1.lineTo(46, 20);
-        ear1.close();
-
-        const ear2 = Skia.Path.Make();
-        ear2.moveTo(54, 20);
-        ear2.lineTo(62, 5);
-        ear2.lineTo(68, 22);
-        ear2.close();
-
-        return { bodyPath, ears: [ear1, ear2], tail: null };
+        return {
+          bodyPath: 'M 30 65 A 20 25 0 1 0 70 65 A 20 25 0 1 0 30 65 Z M 28 32 A 22 22 0 1 0 72 32 A 22 22 0 1 0 28 32 Z',
+          ears: [
+            'M 32 22 L 38 5 L 46 20 Z',
+            'M 54 20 L 62 5 L 68 22 Z',
+          ],
+          tail: null,
+          loafRRect: null,
+        };
       }
 
       case 'loaf': {
-        const bodyPath = Skia.Path.Make();
-        const rrect = Skia.RRectXY({ x: 20, y: 30, width: 60, height: 45 }, 20, 20);
-        bodyPath.addRRect(rrect);
+        return {
+          bodyPath: '',
+          ears: [
+            'M 28 32 L 34 15 L 42 32 Z',
+            'M 58 32 L 66 15 L 72 32 Z',
+          ],
+          tail: null,
+          loafRRect: rrect(rect(20, 30, 60, 45), 20, 20),
+        };
+      }
 
-        const ear1 = Skia.Path.Make();
-        ear1.moveTo(28, 32);
-        ear1.lineTo(34, 15);
-        ear1.lineTo(42, 32);
-        ear1.close();
-
-        const ear2 = Skia.Path.Make();
-        ear2.moveTo(58, 32);
-        ear2.lineTo(66, 15);
-        ear2.lineTo(72, 32);
-        ear2.close();
-
-        return { bodyPath, ears: [ear1, ear2], tail: null };
+      case 'standing': {
+        return {
+          bodyPath: 'M 30 50 A 20 30 0 1 0 70 50 A 20 30 0 1 0 30 50 Z M 30 18 A 20 20 0 1 0 70 18 A 20 20 0 1 0 30 18 Z',
+          ears: [
+            'M 34 10 L 40 -4 L 48 10 Z',
+            'M 52 10 L 60 -4 L 66 10 Z',
+          ],
+          tail: 'M 35 70 Q 15 75 12 55',
+          loafRRect: null,
+        };
       }
 
       case 'kitten':
       default: {
-        const bodyPath = Skia.Path.Make();
-        bodyPath.addCircle(50, 55, 25);
-
-        const headPath = Skia.Path.Make();
-        headPath.addCircle(50, 35, 18);
-        bodyPath.addPath(headPath);
-
-        const ear1 = Skia.Path.Make();
-        ear1.moveTo(35, 25);
-        ear1.lineTo(40, 10);
-        ear1.lineTo(46, 24);
-        ear1.close();
-
-        const ear2 = Skia.Path.Make();
-        ear2.moveTo(54, 24);
-        ear2.lineTo(60, 10);
-        ear2.lineTo(65, 25);
-        ear2.close();
-
-        return { bodyPath, ears: [ear1, ear2], tail: null };
+        return {
+          bodyPath: 'M 25 55 A 25 25 0 1 0 75 55 A 25 25 0 1 0 25 55 Z M 32 35 A 18 18 0 1 0 68 35 A 18 18 0 1 0 32 35 Z',
+          ears: [
+            'M 35 25 L 40 10 L 46 24 Z',
+            'M 54 24 L 60 10 L 65 25 Z',
+          ],
+          tail: null,
+          loafRRect: null,
+        };
       }
     }
   };
 
-  const { bodyPath, ears, tail } = getPosePaths();
-  const cellPaths = [] as any[];
+  const { bodyPath, ears, tail, loafRRect } = getPosePaths();
+  const cellRects = [];
 
   for (let row = 0; row < rows; row++) {
     for (let col = 0; col < cols; col++) {
       if (matrix[row]?.[col] !== 1) continue;
 
-      const cellRect = Skia.RRectXY({
-        x: col * cellWidth + 2,
-        y: row * cellHeight + 2,
-        width: Math.max(cellWidth - 4, 2),
-        height: Math.max(cellHeight - 4, 2),
-      }, 10, 10);
+      const cellRRect = rrect(
+        rect(
+          col * cellWidth + 2,
+          row * cellHeight + 2,
+          Math.max(cellWidth - 4, 2),
+          Math.max(cellHeight - 4, 2)
+        ),
+        10,
+        10
+      );
 
-      const tilePath = Skia.Path.Make();
-      tilePath.addRRect(cellRect);
-      cellPaths.push({ tilePath, row, col });
+      cellRects.push(cellRRect);
     }
   }
 
@@ -188,18 +154,22 @@ export const CatSprite: React.FC<CatSpriteProps> = ({
           strokeWidth={6 * scale}
         />
       )}
-      {cellPaths.length > 0 ? (
+      {cellRects.length > 0 ? (
         <>
-          {cellPaths.map(({ tilePath }, index) => (
-            <Path key={`cell-${index}`} path={tilePath} color={colors.body} opacity={0.96} />
+          {cellRects.map((cellRRect, index) => (
+            <RoundedRect key={`cell-${index}`} rect={cellRRect} color={colors.body} opacity={0.96} />
           ))}
-          {cellPaths.map(({ tilePath }, index) => (
-            <Path key={`cell-inner-${index}`} path={tilePath} color={colors.innerEar} opacity={0.22} />
+          {cellRects.map((cellRRect, index) => (
+            <RoundedRect key={`cell-inner-${index}`} rect={cellRRect} color={colors.innerEar} opacity={0.22} />
           ))}
         </>
       ) : (
         <>
-          <Path path={bodyPath} color={colors.body} />
+          {loafRRect ? (
+            <RoundedRect rect={loafRRect} color={colors.body} />
+          ) : (
+            <Path path={bodyPath} color={colors.body} />
+          )}
           {ears.map((earPath, index) => (
             <Path key={index} path={earPath} color={colors.body} />
           ))}
@@ -222,6 +192,8 @@ const getPoseMatrix = (pose: CatPose): number[][] => {
       return [[1, 1]];
     case 'loaf':
       return [[1, 1, 1, 1]];
+    case 'standing':
+      return [[1, 1], [1, 1], [1, 1]];
     case 'kitten':
     default:
       return [[1]];

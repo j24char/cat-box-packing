@@ -1,4 +1,4 @@
-export type CatPose = 'curl' | 'stretch' | 'sitting' | 'loaf' | 'kitten';
+export type CatPose = 'curl' | 'stretch' | 'sitting' | 'loaf' | 'kitten' | 'standing';
 export type CatBreed = 'calico' | 'tabby' | 'orange' | 'silver' | 'tuxedo' | 'black' | 'white';
 
 export interface GridCoordinates {
@@ -27,6 +27,11 @@ export const CAT_SHAPES: Record<CatPose, number[][]> = {
   sitting: [[1, 1]],
   loaf: [[1, 1, 1, 1]],
   kitten: [[1]],
+  standing: [
+    [1, 1],
+    [1, 1],
+    [1, 1],
+  ],
 };
 
 export const cloneShapeMatrix = (matrix: number[][]): number[][] =>

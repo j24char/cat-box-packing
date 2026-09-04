@@ -35,7 +35,7 @@ export const isValidPlacement = (
   gridConfig: BoxGridConfig,
   existingCats: CatPiece[]
 ): boolean => {
-  const { rows, cols, mask } = gridConfig;
+  const { rows, cols, mask, obstacles } = gridConfig;
   const { shapeMatrix } = cat;
 
   for (let r = 0; r < shapeMatrix.length; r++) {
@@ -54,11 +54,40 @@ export const isValidPlacement = (
           return false;
         }
 
+        // Check if cell is occupied by an obstacle (catnip or cucumber)
+        if (obstacles?.some((ob) => ob.x === boardX && ob.y === boardY)) {
+          return false;
+        }
+
         // Check collision against other already placed cat pieces
         for (const placedCat of existingCats) {
           if (placedCat.id === cat.id || !placedCat.currentPosition) continue;
 
           if (isCellOccupiedByCat(placedCat, boardX, boardY)) {
+            return false;
+          }
+        }
+      }
+    }
+  }
+
+  // Cucumber rule: only sleeping cats (curl) can be placed adjacent to cucumbers
+  if (obstacles && cat.isAwake) {
+    const cucumberCells = obstacles
+      .filter((ob) => ob.type === 'cucumber')
+      .map((ob) => ({ x: ob.x, y: ob.y }));
+
+    for (const cell of cucumberCells) {
+      // Check if any part of the cat is adjacent to a cucumber
+      for (let r = 0; r < shapeMatrix.length; r++) {
+        for (let c = 0; c < shapeMatrix[r].length; c++) {
+          if (shapeMatrix[r][c] !== 1) continue;
+          const boardX = targetCoords.x + c;
+          const boardY = targetCoords.y + r;
+
+          const isAdjacent =
+            Math.abs(boardX - cell.x) + Math.abs(boardY - cell.y) === 1;
+          if (isAdjacent) {
             return false;
           }
         }
@@ -103,10 +132,17 @@ export const isLevelComplete = (
   gridConfig: BoxGridConfig
 ): boolean => {
   const mask = gridConfig.mask ?? Array.from({ length: gridConfig.rows }, () => Array(gridConfig.cols).fill(1));
-  const playableCellCount = mask.reduce(
-    (total, row) => total + row.reduce((rowTotal, cell) => rowTotal + (cell === 0 ? 0 : 1), 0),
-    0
-  );
+  const obstacles = gridConfig.obstacles ?? [];
+
+  // Count playable cells excluding mask-blocked cells and obstacle cells
+  let playableCellCount = 0;
+  for (let y = 0; y < gridConfig.rows; y++) {
+    for (let x = 0; x < gridConfig.cols; x++) {
+      if (mask[y]?.[x] === 0) continue;
+      if (obstacles.some((ob) => ob.x === x && ob.y === y)) continue;
+      playableCellCount++;
+    }
+  }
 
   const filledCells = new Set<string>();
 
@@ -125,6 +161,10 @@ export const isLevelComplete = (
         }
 
         if (mask[boardY]?.[boardX] === 0) {
+          return false;
+        }
+
+        if (obstacles.some((ob) => ob.x === boardX && ob.y === boardY)) {
           return false;
         }
 

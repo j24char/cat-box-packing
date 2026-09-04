@@ -27,6 +27,7 @@ export const Board: React.FC<BoardProps> = ({
         rows={gridConfig.rows}
         cols={gridConfig.cols}
         mask={gridConfig.mask}
+        obstacles={gridConfig.obstacles}
         tileSize={tileSize}
         onGridMeasured={onGridMeasured}
       />
