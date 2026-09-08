@@ -123,47 +123,57 @@ export const useGameState = (initialLevelId: number = 1) => {
   );
 
   const rotateCat = useCallback(
-    (catId: string) => {
-      if (isComplete) return false;
+  (catId: string) => {
+    if (isComplete) return false;
 
-      const findCatInLists = () =>
-        unpackedCats.find((c) => c.id === catId) || placedCats.find((c) => c.id === catId);
-      const cat = findCatInLists();
-      if (!cat) return false;
+    const findCatInLists = () =>
+      unpackedCats.find((c) => c.id === catId) || placedCats.find((c) => c.id === catId);
+    const cat = findCatInLists();
+    if (!cat) return false;
 
-      // Only Stretching and Loaf cats can be rotated
-      if (cat.pose !== 'stretch' && cat.pose !== 'loaf') return false;
+    // Only Stretching and Loaf cats can be rotated
+    if (cat.pose !== 'stretch' && cat.pose !== 'loaf') return false;
 
-      const unpacked = unpackedCats.find((c) => c.id === catId);
-      if (unpacked) {
-        setUnpackedCats((prev) =>
-          prev.map((c) =>
-            c.id === catId ? { ...c, shapeMatrix: rotateMatrix(c.shapeMatrix) } : c
-          )
-        );
-        bumpAction();
-        return true;
-      }
+    const currentRotation = cat.rotation ?? 0;
+    const nextRotation = (currentRotation + 90) % 360;
 
-      const placed = placedCats.find((c) => c.id === catId);
-      if (!placed || !placed.currentPosition) return false;
-
-      const rotated: CatPiece = {
-        ...placed,
-        shapeMatrix: rotateMatrix(placed.shapeMatrix),
-      };
-      const others = placedCats.filter((c) => c.id !== catId);
-
-      if (!isValidPlacement(rotated, placed.currentPosition, level.gridConfig, others)) {
-        return false;
-      }
-
-      setPlacedCats([...others, rotated]);
+    const unpacked = unpackedCats.find((c) => c.id === catId);
+    if (unpacked) {
+      setUnpackedCats((prev) =>
+        prev.map((c) =>
+          c.id === catId
+            ? {
+                ...c,
+                shapeMatrix: rotateMatrix(c.shapeMatrix),
+                rotation: nextRotation,
+              }
+            : c
+        )
+      );
       bumpAction();
       return true;
-    },
-    [unpackedCats, placedCats, isComplete, level]
-  );
+    }
+
+    const placed = placedCats.find((c) => c.id === catId);
+    if (!placed || !placed.currentPosition) return false;
+
+    const rotated: CatPiece = {
+      ...placed,
+      shapeMatrix: rotateMatrix(placed.shapeMatrix),
+      rotation: nextRotation,
+    };
+    const others = placedCats.filter((c) => c.id !== catId);
+
+    if (!isValidPlacement(rotated, placed.currentPosition, level.gridConfig, others)) {
+      return false;
+    }
+
+    setPlacedCats([...others, rotated]);
+    bumpAction();
+    return true;
+  },
+  [unpackedCats, placedCats, isComplete, level]
+);
 
   // Check if a cat is adjacent to a catnip toy (disables boredom)
   const isCatAdjacentToCatnip = useCallback(

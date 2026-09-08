@@ -6,13 +6,16 @@ export interface GridCoordinates {
   y: number;
 }
 
+// src/models/Cat.ts
+
 export interface CatPiece {
   id: string;
   breed: CatBreed;
   pose: CatPose;
-  isAwake: boolean;
-  shapeMatrix: number[][]; // e.g. [[1, 1], [0, 1]] for polyomino fitting
+  shapeMatrix: number[][];
+  rotation?: number; // 0, 90, 180, 270
   currentPosition?: GridCoordinates;
+  isAwake?: boolean;
 }
 
 export const CAT_SHAPES: Record<CatPose, number[][]> = {

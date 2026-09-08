@@ -325,6 +325,7 @@ const DraggableCatPiece: React.FC<DraggableCatProps> = ({
         <CatSprite
           breed={cat.breed}
           pose={cat.pose}
+          rotation={cat.rotation ?? 0}
           width={pieceWidth - 4}
           height={pieceHeight - 4}
           shapeMatrix={cat.shapeMatrix}
