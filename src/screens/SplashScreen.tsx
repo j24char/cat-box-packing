@@ -139,7 +139,7 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   stripeBackground: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     flexDirection: 'row',
     opacity: 0.45,
   },

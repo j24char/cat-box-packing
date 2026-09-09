@@ -10,13 +10,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { GameButton } from '../components/GameButton';
+import { RootStackParamList } from '../navigation/AppNavigator';
 import { COLORS, FONTS } from '../constants/theme';
-
-type RootStackParamList = {
-  Home: undefined;
-  LevelSelect: undefined;
-  Game: { levelId: number };
-};
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
@@ -62,6 +57,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 title="QUICK PLAY"
                 variant="secondary"
                 onPress={() => navigation.navigate('Game', { levelId: 1 })}
+              />
+              <GameButton
+                title="STATISTICS"
+                variant="accent"
+                onPress={() => navigation.navigate('Stats')}
               />
             </View>
           </View>

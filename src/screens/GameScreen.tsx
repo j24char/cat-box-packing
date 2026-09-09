@@ -26,6 +26,7 @@ import { GameButton } from '../components/GameButton';
 import { useGameState } from '../hooks/useGameState';
 import { useAudio } from '../hooks/useAudio';
 import { useLevelProgress } from '../hooks/useLevelProgress';
+import { analytics } from '../services/analytics';
 import { COLORS, globalStyles } from '../constants/theme';
 import { CatPiece, GridCoordinates, getCatShapeSize } from '../models/Cat';
 import { BoxGridConfig, getNextLevelId, starsFromTime } from '../models/Level';
@@ -392,6 +393,12 @@ export default function GameScreen({ route, navigation }: Props) {
 
   useEffect(() => {
     progressSavedRef.current = false;
+    // Analytics: open a new level attempt for the current level (PRD §7).
+    analytics.beginLevelAttempt(level.id).finally(() => undefined);
+    return () => {
+      // Analytics: finalize an attempt that was left unfinished (e.g. navigate away).
+      analytics.endLevelAttempt({ completed: false }).finally(() => undefined);
+    };
   }, [level.id]);
 
   useEffect(() => {
@@ -399,6 +406,8 @@ export default function GameScreen({ route, navigation }: Props) {
     progressSavedRef.current = true;
     playSound('purr');
     recordWin(level.id, starsFromTime(elapsedSeconds, level.targetTime));
+    // Analytics: finalize the attempt as a completed level (PRD §7).
+    analytics.completeLevel(level.id, elapsedSeconds).finally(() => undefined);
   }, [isComplete, elapsedSeconds, level.id, level.targetTime, playSound, recordWin]);
 
   useEffect(() => {
@@ -420,6 +429,8 @@ export default function GameScreen({ route, navigation }: Props) {
   }, [isComplete, isDragging, placedCats.length, actionNonce, triggerMouseDistraction]);
 
   const handleDropCat = (catId: string, coords: GridCoordinates | null, valid: boolean) => {
+    // Analytics: record a drop interaction (PRD §7).
+    analytics.trackInteraction('drop').finally(() => undefined);
     if (!coords) {
       unplaceCat(catId);
       return;
@@ -427,6 +438,27 @@ export default function GameScreen({ route, navigation }: Props) {
     if (valid) {
       placeCat(catId, coords);
     }
+  };
+
+  const handleRotateCat = (catId: string) => {
+    // Analytics: record a rotate interaction (PRD §7).
+    analytics.trackInteraction('rotate').finally(() => undefined);
+    rotateCat(catId);
+  };
+
+  const handleDragChange = (dragging: boolean) => {
+    if (dragging) {
+      // Analytics: record a drag interaction (PRD §7).
+      analytics.trackInteraction('drag').finally(() => undefined);
+    }
+    setIsDragging(dragging);
+  };
+
+  const handleResetLevel = () => {
+    // Analytics: finalize the current attempt (uncompleted) and open a fresh one.
+    analytics.endLevelAttempt({ completed: false }).finally(() => undefined);
+    analytics.beginLevelAttempt(level.id).finally(() => undefined);
+    resetLevel();
   };
 
   const highlightLocal = (cellX: number, cellY: number) => {
@@ -466,7 +498,7 @@ export default function GameScreen({ route, navigation }: Props) {
             </Text>
           </View>
 
-          <TouchableOpacity style={globalStyles.iconButton} onPress={resetLevel}>
+          <TouchableOpacity style={globalStyles.iconButton} onPress={handleResetLevel}>
             <Text style={styles.iconText}>🔄</Text>
           </TouchableOpacity>
         </View>
@@ -543,8 +575,8 @@ export default function GameScreen({ route, navigation }: Props) {
             overlayRect={overlayRect}
             onHoverCells={setHoverCells}
             onDropCat={handleDropCat}
-            onRotate={rotateCat}
-            onDragChange={setIsDragging}
+            onRotate={handleRotateCat}
+            onDragChange={handleDragChange}
             draggingCatId={draggingCatId}
             ejectedCatId={ejectedCatId}
           />

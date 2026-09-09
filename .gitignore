@@ -33,6 +33,9 @@ yarn-error.*
 # local env files
 .env*.local
 
+# local analytics test build artifacts
+.build-test/
+
 # typescript
 *.tsbuildinfo
 
