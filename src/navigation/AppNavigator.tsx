@@ -3,7 +3,6 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import HomeScreen from '../screens/HomeScreen';
 import LevelSelectScreen from '../screens/LevelSelectScreen';
 import GameScreen from '../screens/GameScreen';
-import StatisticsScreen from '../screens/StatisticsScreen';
 import { COLORS } from '../constants/colors';
 
 export type RootStackParamList = {
@@ -28,7 +27,6 @@ export default function AppNavigator() {
       <Stack.Screen name="Home" component={HomeScreen} />
       <Stack.Screen name="LevelSelect" component={LevelSelectScreen} />
       <Stack.Screen name="Game" component={GameScreen} />
-      <Stack.Screen name="Stats" component={StatisticsScreen} />
     </Stack.Navigator>
   );
 }

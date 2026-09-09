@@ -28,7 +28,6 @@
 - **Retention** per installation: D1 / D2 / D7 / D14 / D30 with maturity flags
 - **Level Completion** per installation: completed-level count + per-level completion times
 - **Anonymous Firebase collection**: Firebase Auth anonymous `accounts:signUp` → id token → Firestore `documents:commit` push into `catBoxAnalytics/installations/{installationId}` (`src/services/analytics/firebaseClient.ts`)
-- **In-app reporting screen**: `StatisticsScreen` reachable from Home (min/max/avg per level, retention, sync status)
 - **Session lifecycle wiring**: `App.tsx` (start/touch/end + periodic flush), `GameScreen.tsx` (interaction + attempt + completion tracking)
 - **Tests**: `npm run test:analytics` (integration test with mocked store/fetch) + smoke tests of the pure aggregation logic
 - Verified: TypeScript typecheck ✅ passing

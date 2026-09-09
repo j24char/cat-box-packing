@@ -58,11 +58,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 variant="secondary"
                 onPress={() => navigation.navigate('Game', { levelId: 1 })}
               />
-              <GameButton
-                title="STATISTICS"
-                variant="accent"
-                onPress={() => navigation.navigate('Stats')}
-              />
             </View>
           </View>
         </SafeAreaView>

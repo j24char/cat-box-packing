@@ -32,8 +32,8 @@ export const GOOGLE_SERVICE_INFO_PLIST: string = `<?xml version="1.0" encoding="
 <plist version="1.0">
 <dict>
 	<key>API_KEY</key>
-	<string>AIzaSyDdTbd1DV7kUIj_uuCyjA7s32pwGzSKZUM</string>
-	<key>GCM_SENDER_ID</key>
+  <string>${process.env.EXPO_PUBLIC_GOOGLE_API_KEY ?? ''}</string>
+  <key>GCM_SENDER_ID</key>
 	<string>770686235964</string>
 	<key>PLIST_VERSION</key>
 	<string>1</string>
