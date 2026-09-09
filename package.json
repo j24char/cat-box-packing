@@ -31,7 +31,9 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "test:analytics": "node scripts/analytics-integration-test.js"
+    "test:analytics": "node scripts/analytics-integration-test.js",
+    "build": "expo build",
+    "test": "jest"
   },
   "private": true
 }
