@@ -87,6 +87,7 @@ const httpJson = async (
   }
   return { status: result.status, body };
 };
+
 const loadCachedAuth = async (): Promise<CachedAuth | null> => {
   try {
     const raw = await AsyncStorage.getItem(AUTH_STORAGE_KEY);
@@ -185,7 +186,9 @@ const toFirestoreField = (value: unknown): FirestoreField => {
   if (typeof value === 'string') return { stringValue: value };
   if (typeof value === 'boolean') return { booleanValue: value };
   if (typeof value === 'number') {
-    return Number.isInteger(value) ? { integerValue: value } : { doubleValue: value };
+    return Number.isInteger(value) 
+      ? { integerValue: String(value) } 
+      : { doubleValue: value };
   }
   if (Array.isArray(value)) {
     return { arrayValue: { values: value.map(toFirestoreField) } };
@@ -200,17 +203,14 @@ const toFirestoreField = (value: unknown): FirestoreField => {
   return { nullValue: null };
 };
 
-/**
- * Pushes the aggregated (already anonymous) analytics snapshot to Firestore.
- * Throws on failure so callers can record the sync status.
- */
 export const pushSnapshotToFirebase = async (snapshot: AnalyticsSnapshot): Promise<void> => {
   if (!FIREBASE_CONFIG.apiKey || !FIREBASE_CONFIG.projectId) {
     throw new Error('analytics: Firebase config incomplete');
   }
 
   const auth = await ensureIdToken();
-  const documentName = `projects/${FIREBASE_CONFIG.projectId}/databases/(default)/documents/catBoxAnalytics/installations/${snapshot.installationId}`;
+  // Valid document path: collection 'catBoxAnalytics', document ID = installationId
+  const documentName = `projects/${FIREBASE_CONFIG.projectId}/databases/(default)/documents/catBoxAnalytics/${snapshot.installationId}`;
 
   const payload: Record<string, unknown> = {
     installationId: snapshot.installationId,
@@ -236,10 +236,8 @@ export const pushSnapshotToFirebase = async (snapshot: AnalyticsSnapshot): Promi
       body: {
         writes: [
           {
-            document: {
+            update: {
               name: documentName,
-              // toFirestoreField wraps the object in { mapValue: { fields } },
-              // so unwrap one level to get the flat field map the API expects.
               fields: toFirestoreField(payload).mapValue?.fields ?? {},
             },
           },
@@ -252,7 +250,6 @@ export const pushSnapshotToFirebase = async (snapshot: AnalyticsSnapshot): Promi
     throw new Error(`analytics: Firestore push failed (${status})`);
   }
 };
-
 /** Helper so the stats screen can render Firebase config state (for debugging). */
 export const isFirebaseConfigured = (): boolean =>
   Boolean(FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.projectId);

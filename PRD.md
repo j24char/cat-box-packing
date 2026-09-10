@@ -73,10 +73,15 @@ The game consists of **20 static levels** designed with a progressive difficulty
 Since final artwork will be added later, the prototype must rely on structured graphical placeholders:
 
 * **Grid & Box Boundary:** Rendered using crisp 2D line borders and background tile grids.
+  * **Shadow:** Cats placed into the box will shade the cells that are covered by that cat.
 * **Cat Pieces:** Geometric shapes matching the cell dimensions - they will shade out the cells they consume when a cat is dropped in the box.
   * *Pose:* Determines the cells used by the shape of the cat (e.g., `"kitten"`, `"curl"`, `"sitting"`, `"stretch"`, `"loaf"`, `"standing"`).
-  * *Breed:* Determines the color and artwork associated with each cat (e.g., `"calico"`, `"tabby"`, `"siamese"`, `"silver"`, `"tuxedo"`, `"black"`).
-* **Unpacked Area:** Rendered using crisp 2D line borders. Cats here are evenly spaced horizontally and shown at 75% size until selected.
+  * *Breed:* Determines the artwork associated with each cat (e.g., `"calico"`, `"tabby"`, `"siamese"`, `"silver"`, `"tuxedo"`, `"black"`).
+  * **Image: ** An image is associated with each cat type and breed. The image is centered on the cells associated with the cat.
+* **Unpacked Area:** Rendered using crisp 2D line borders. Cats here are evenly spaced horizontally and shown at 50% size until selected.
+  * **Location:** Cats in unpacked area are evenly spaced horizontally so all cats are accessible for drag and drop.
+  * **Size:** Cats in unpacked area are displayed at 50% size until selected or placed.
+  * **Rotate:** Cats in unpacked area that may be rotated will rotate when tapped, but remain centered on the placed location in unpacked area.
 * **Obstacles:**
   * **Cucumber:** Green oval in a cell.
   * **Catnip:** Blue circle in a cell.
@@ -94,6 +99,7 @@ Since final artwork will be added later, the prototype must rely on structured g
 ## 7. Statistics and Metrics
 
 * **Analytics collection:** Use Firebase analytics to collect anonymous information. Firebase info stored in GoogleService-Info.plist
+  * **Background collection:** None of the analytics should be visible to the user/player of the game. 
   * **Gameplay duration:** Track for each installation: max time used per session, min time used per session, average time used per session.
   * **Level interactions:** Track the min/max/average number of interactions (drag&drop, rotate) at each level (to be reported for each level) for each installation.
   * **Sessions:** Track the number of sessions per installation.
