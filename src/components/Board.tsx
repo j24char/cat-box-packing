@@ -1,19 +1,19 @@
-// src/components/Board.tsx
-
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { BoxTile } from './BoxTile';
 import { BoxGridConfig } from '../models/Level';
 
+interface Rect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 interface BoardProps {
   gridConfig: BoxGridConfig;
   tileSize?: number;
-  onGridMeasured?: (measurements: {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  }) => void;
+  onGridMeasured?: (measurements: Rect) => void;
 }
 
 export const Board: React.FC<BoardProps> = ({

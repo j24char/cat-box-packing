@@ -113,12 +113,11 @@ const DraggableCatPiece: React.FC<DraggableCatProps> = ({
 
   const starting = (() => {
     if (isPlaced && cat.currentPosition && gridRect) {
-      const local = toLocal(
+      return toLocal(
         gridRect.x + cat.currentPosition.x * tileSize,
         gridRect.y + cat.currentPosition.y * tileSize,
         overlayRect
       );
-      return local;
     }
     return tray;
   })();
@@ -393,10 +392,8 @@ export default function GameScreen({ route, navigation }: Props) {
 
   useEffect(() => {
     progressSavedRef.current = false;
-    // Analytics: open a new level attempt for the current level (PRD §7).
     analytics.beginLevelAttempt(level.id).finally(() => undefined);
     return () => {
-      // Analytics: finalize an attempt that was left unfinished (e.g. navigate away).
       analytics.endLevelAttempt({ completed: false }).finally(() => undefined);
     };
   }, [level.id]);
@@ -406,7 +403,6 @@ export default function GameScreen({ route, navigation }: Props) {
     progressSavedRef.current = true;
     playSound('purr');
     recordWin(level.id, starsFromTime(elapsedSeconds, level.targetTime));
-    // Analytics: finalize the attempt as a completed level (PRD §7).
     analytics.completeLevel(level.id, elapsedSeconds).finally(() => undefined);
   }, [isComplete, elapsedSeconds, level.id, level.targetTime, playSound, recordWin]);
 
@@ -419,17 +415,15 @@ export default function GameScreen({ route, navigation }: Props) {
     return () => clearTimeout(timer);
   }, [isComplete, isDragging, placedCats.length, jumpOutCount, actionNonce, ejectRandomCat]);
 
-  // Mouse distraction: randomly triggers while playing
   useEffect(() => {
     if (isComplete || isDragging || placedCats.length === 0) return;
     const mouseTimer = setTimeout(() => {
       triggerMouseDistraction();
-    }, 30000 + Math.random() * 30000); // Random between 30-60 seconds
+    }, 30000 + Math.random() * 30000);
     return () => clearTimeout(mouseTimer);
   }, [isComplete, isDragging, placedCats.length, actionNonce, triggerMouseDistraction]);
 
   const handleDropCat = (catId: string, coords: GridCoordinates | null, valid: boolean) => {
-    // Analytics: record a drop interaction (PRD §7).
     analytics.trackInteraction('drop').finally(() => undefined);
     if (!coords) {
       unplaceCat(catId);
@@ -441,21 +435,18 @@ export default function GameScreen({ route, navigation }: Props) {
   };
 
   const handleRotateCat = (catId: string) => {
-    // Analytics: record a rotate interaction (PRD §7).
     analytics.trackInteraction('rotate').finally(() => undefined);
     rotateCat(catId);
   };
 
   const handleDragChange = (dragging: boolean) => {
     if (dragging) {
-      // Analytics: record a drag interaction (PRD §7).
       analytics.trackInteraction('drag').finally(() => undefined);
     }
     setIsDragging(dragging);
   };
 
   const handleResetLevel = () => {
-    // Analytics: finalize the current attempt (uncompleted) and open a fresh one.
     analytics.endLevelAttempt({ completed: false }).finally(() => undefined);
     analytics.beginLevelAttempt(level.id).finally(() => undefined);
     resetLevel();
@@ -541,6 +532,34 @@ export default function GameScreen({ route, navigation }: Props) {
           </View>
         </View>
 
+        {/* 1. Placed Cats Background Shading */}
+        {gridRect &&
+          overlayRect &&
+          placedCats.flatMap((cat) => {
+            if (!cat.currentPosition) return [];
+            const occupied = getOccupiedCells(cat.shapeMatrix, cat.currentPosition);
+
+            return occupied.map((cell) => {
+              const pos = highlightLocal(cell.x, cell.y);
+              return (
+                <View
+                  key={`shaded-${cat.id}-${cell.x}-${cell.y}`}
+                  pointerEvents="none"
+                  style={[
+                    styles.shadedCell,
+                    {
+                      left: pos.left,
+                      top: pos.top,
+                      width: tileSize,
+                      height: tileSize,
+                    },
+                  ]}
+                />
+              );
+            });
+          })}
+
+        {/* 2. Drag Hover Highlights */}
         {hoverCells?.map((cell) => {
           const pos = highlightLocal(cell.x, cell.y);
           return (
@@ -562,6 +581,7 @@ export default function GameScreen({ route, navigation }: Props) {
           );
         })}
 
+        {/* 3. Draggable Cats */}
         {allCats.map((cat) => (
           <DraggableCatPiece
             key={cat.id}
@@ -729,6 +749,14 @@ const styles = StyleSheet.create({
     left: 0,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  shadedCell: {
+    position: 'absolute',
+    backgroundColor: 'rgba(0, 0, 0, 0.25)',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.15)',
+    zIndex: 2,
   },
   hoverCell: {
     position: 'absolute',

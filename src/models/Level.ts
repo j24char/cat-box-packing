@@ -161,10 +161,10 @@ export const SAMPLE_LEVELS: Level[] = [
     ],
     [
       [0, 1, 1, 1, 0],
+      [0, 1, 1, 1, 1],
       [1, 1, 1, 1, 1],
       [1, 1, 1, 1, 1],
-      [1, 1, 1, 1, 1],
-      [0, 1, 1, 1, 0],
+      [0, 1, 1, 1, 1],
     ]
   ),
   // Levels 11-15: Obstacles Introduced (Standing Cats, Catnip, Cucumbers)
@@ -189,7 +189,7 @@ export const SAMPLE_LEVELS: Level[] = [
     4,
     4,
     [
-      { breed: 'silver', pose: 'standing' },
+      { breed: 'silver', pose: 'curl' },
       { breed: 'tuxedo', pose: 'curl' },
       { breed: 'white', pose: 'curl' },
       { breed: 'orange', pose: 'kitten' },

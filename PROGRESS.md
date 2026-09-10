@@ -1,3 +1,12 @@
+### Task 1: Shade area covered by placed cat
+
+- **Goal:** Add shading where a cat placed in the box has covered each cell so user can see the remaining open cells.
+- **Status:** Completed
+- **Changes:**
+  - Added shading to the cells covered by a placed cat in the `Board` component.
+  - Updated the `placeCat` function to manage the shading for the cells covered by the cat.
+
+
 # Cat Box Packing - Progress Tracker
 
 ## Current Status: Baseline Assessment
