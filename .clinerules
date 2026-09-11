@@ -1,11 +1,12 @@
 # Execution & Refinement Guidelines
 
 1. **Source of Truth**: Read `PRD.md` prior to executing tasks. Ensure all technical, functional, and layout specifications are met.
-2. **Autonomous Verification Loop**:
-   - After implementing or modifying features, run tests, build tools, or linters automatically to verify changes.
-   - If a build or test fails, diagnose the error and fix it immediately before moving to the next task.
-3. **Progress Tracking**:
+2. **Ignore**: Do not search, read, or modify the following directories: node_modules/, .git/, dist/, build/, .expo/
+3. **Autonomous Verification Loop**:
+   - After implementing or modifying features, run linters automatically to verify changes.
+   - If lint shows errors, diagnose the error and fix it immediately before moving to the next task.
+4. **Progress Tracking**:
    - Maintain a file named `PROGRESS.md` in the project root.
    - Track implemented features, passing/failing tests, and remaining PRD requirements.
-4. **Completion Criterion**:
+5. **Completion Criterion**:
    - Do not complete the task until every requirement in `PRD.md` is verified and building without errors.
