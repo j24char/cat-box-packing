@@ -74,17 +74,24 @@ const toLocal = (windowX: number, windowY: number, overlay: ScreenRect | null) =
   y: windowY - (overlay?.y ?? 0),
 });
 
+const TRAY_SLOT_WIDTH = 68;
+const TRAY_SLOT_HEIGHT = 62;
+
+/**
+ * Returns the top-left corner of the tray slot rect for a given cat index.
+ * Cats are aligned across up to 4 columns; the slot rect is used as a
+ * centering anchor so a cat stays visually centered when rotated in the tray.
+ */
 const getTrayPosition = (index: number, total: number, overlay: ScreenRect | null) => {
   const cols = Math.min(4, Math.max(total, 1));
   const col = index % cols;
   const row = Math.floor(index / cols);
-  const slot = 68;
-  const totalWidth = cols * slot;
+  const totalWidth = cols * TRAY_SLOT_WIDTH;
   const startX = (SCREEN_WIDTH - totalWidth) / 2;
   const overlayOffsetY = overlay?.y ?? 0;
   return {
-    x: startX - (overlay?.x ?? 0) + col * slot,
-    y: SCREEN_HEIGHT - overlayOffsetY - 168 + row * 62,
+    x: startX - (overlay?.x ?? 0) + col * TRAY_SLOT_WIDTH,
+    y: SCREEN_HEIGHT - overlayOffsetY - 168 + row * TRAY_SLOT_HEIGHT,
   };
 };
 
@@ -109,6 +116,19 @@ const DraggableCatPiece: React.FC<DraggableCatProps> = ({
   const pieceWidth = shapeSize.width * tileSize;
   const pieceHeight = shapeSize.height * tileSize;
   const tray = getTrayPosition(trayIndex, trayCount, overlayRect);
+
+  // The tray anchor is the CENTER of the slot. `getTrayHome` offsets the piece
+  // so its bounding box (blocks) is centered on that anchor, which keeps the
+  // cat's image and cells centered when it is rotated in the unpacked area.
+  const trayCenter = {
+    x: tray.x + TRAY_SLOT_WIDTH / 2,
+    y: tray.y + TRAY_SLOT_HEIGHT / 2,
+  };
+  const getTrayHome = (w: number, h: number) => ({
+    x: trayCenter.x - w / 2,
+    y: trayCenter.y - h / 2,
+  });
+
   const isPlaced = Boolean(cat.currentPosition && gridRect && overlayRect);
 
   const starting = (() => {
@@ -119,7 +139,7 @@ const DraggableCatPiece: React.FC<DraggableCatProps> = ({
         overlayRect
       );
     }
-    return tray;
+    return getTrayHome(pieceWidth, pieceHeight);
   })();
 
   const globalX = useSharedValue(starting.x);
@@ -141,7 +161,7 @@ const DraggableCatPiece: React.FC<DraggableCatProps> = ({
           overlayRect
         );
       }
-      return tray;
+      return getTrayHome(pieceWidth, pieceHeight);
     })();
 
     if (ejected && !cat.currentPosition) {
@@ -249,8 +269,9 @@ const DraggableCatPiece: React.FC<DraggableCatProps> = ({
       return;
     }
 
-    globalX.value = withSpring(tray.x, { damping: 14, stiffness: 100 });
-    globalY.value = withSpring(tray.y, { damping: 14, stiffness: 100 });
+    const home = getTrayHome(pieceWidth, pieceHeight);
+    globalX.value = withSpring(home.x, { damping: 14, stiffness: 100 });
+    globalY.value = withSpring(home.y, { damping: 14, stiffness: 100 });
     onDropCat(cat.id, null, true);
   };
 
@@ -298,8 +319,10 @@ const DraggableCatPiece: React.FC<DraggableCatProps> = ({
     cat.shapeMatrix,
     gridRect?.x,
     gridRect?.y,
-    tray.x,
-    tray.y,
+    trayCenter.x,
+    trayCenter.y,
+    pieceWidth,
+    pieceHeight,
     ejectedCatId,
     tileSize,
   ]);

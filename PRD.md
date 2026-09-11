@@ -106,15 +106,20 @@ Since final artwork will be added later, the prototype must rely on structured g
   * **Retention:** Track D1 retention, D2 retention, D7 retention, D14 retention, D30 retention.
   * **Level Completion** Track the number of levels completed per installation.
 
-  # Incomplete Tasks
+  # Tasks
 
-- [ ] **Task 1: Shade area covered by placed cat**
+- [X] **Task 1: Shade area covered by placed cat**
   - Goal: Add shading where a cat placed in the box has covered each cell so user can see remaining open cells.
   - Context: PRD section 5.
 
 - [ ] **Task 2: Center unpacked cats and associated image**
-  - Goal: Image of cat and associated blocks remain centered at placed location in unpacked area such that rotating cat does not change image location.
+  - Goal: Image of cat and associated blocks must be centered at location in unpacked area such that rotating cat does not change image location.
   - Context: PRD section 5.
+  - Success: No impact on drag and drop gameplay, no impact on the location of placed image (or shaded area) when cat placed in the box. Only the placement in the unpacked area is updated.
 
 - [ ] **Task 3: Implement purring sound when a cat is placed next to catnip 
   - Goal: Purr audio sound plays when cat placed in a cell adjacent to catnip
+
+- [ ] **Task 4: Level completed when all unpacked cats are placed in box
+  - Goal: Change so the level is completed when all unpacked cats are placed in the box
+  - Context: Not all cells in the box need to be filled to complete the level

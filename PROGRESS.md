@@ -1,13 +1,32 @@
-### Task 1: Shade area covered by placed cat
+# Cat Box Packing - Progress Tracker
 
-- **Goal:** Add shading where a cat placed in the box has covered each cell so user can see the remaining open cells.
+## PRD Incomplete Tasks
+
+### ✅ Task 1: Shade area covered by placed cat
+- **Goal:** Add shading where a cat placed in the box has covered each cell so the user can see the remaining open cells.
 - **Status:** Completed
 - **Changes:**
-  - Added shading to the cells covered by a placed cat in the `Board` component.
-  - Updated the `placeCat` function to manage the shading for the cells covered by the cat.
+  - Shade overlay rendered in `src/screens/GameScreen.tsx` over every cell occupied by a
+    placed cat, using `getOccupiedCells(shapeMatrix, currentPosition)` + a translucent
+    `shadedCell` style, so remaining open cells stay clearly visible.
+  - Overlay is absolutely positioned relative to the board and re-renders as cats are
+    placed/unplaced (driven by `placedCats` from `useGameState`).
+  - `src/components/Board.tsx` restored to the clean grid renderer (`BoxTile` + `onGridMeasured`).
 
+### ✅ Task 2: Center unpacked cats and associated image
+- **Goal:** Image of cat and associated blocks remain centered at placed location in unpacked area such that rotating cat does not change image location.
+- **Status:** Completed
+- **Changes:**
+  - Added `TRAY_SLOT_WIDTH` / `TRAY_SLOT_HEIGHT` constants describing the tray slot grid.
+  - `DraggableCatPiece` (in `GameScreen.tsx`) now anchors each unpacked cat on the CENTER of
+    its tray slot via `trayCenter` + `getTrayHome()`, so the piece bounding box (blocks) is
+    centered at the slot location regardless of orientation.
+  - Initial placement, snap-to-rest, and the drop-outside-board fallback all use the centered
+    home position; re-snapping happens automatically on rotation (`shapeMatrix` change).
+  - `CatSprite` keeps the image centered inside the piece and rotates about the image's own
+    center, so the image stays put while a rotatable cat (Stretching/Loaf) is rotated.
 
-# Cat Box Packing - Progress Tracker
+## Current Status: Baseline Assessment
 
 ## Current Status: Baseline Assessment
 

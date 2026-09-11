@@ -174,7 +174,7 @@ interface FirestoreField {
   nullValue?: null;
   stringValue?: string;
   booleanValue?: boolean;
-  integerValue?: number;
+  integerValue?: string; // Firestore REST encodes integers as their string form
   doubleValue?: number;
   mapValue?: { fields: Record<string, FirestoreField> };
   arrayValue?: { values: FirestoreField[] };
