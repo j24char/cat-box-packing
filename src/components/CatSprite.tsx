@@ -106,7 +106,7 @@ export const CatSprite: React.FC<CatSpriteProps> = ({
 
   const isKitten = pose === 'kitten';
   const isLoaf = pose === 'loaf';
-  const scale = isKitten ? 0.8 : isLoaf ? 2.9 : 1.0;
+  const scale = isKitten ? 0.9 : isLoaf ? 3.5 : 1.0;
 
   return (
     <View style={[styles.container, { width: canvasWidth, height: canvasHeight }, style]}>

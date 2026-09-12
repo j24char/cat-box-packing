@@ -115,23 +115,20 @@ const DraggableCatPiece: React.FC<DraggableCatProps> = ({
   const shapeSize = getCatShapeSize(cat.shapeMatrix);
   const pieceWidth = shapeSize.width * tileSize;
   const pieceHeight = shapeSize.height * tileSize;
+  
+  // Tray position returns the exact fixed top-left origin for this tray slot
   const tray = getTrayPosition(trayIndex, trayCount, overlayRect);
-
-  // The tray anchor is the CENTER of the slot. `getTrayHome` offsets the piece
-  // so its bounding box (blocks) is centered on that anchor, which keeps the
-  // cat's image and cells centered when it is rotated in the unpacked area.
-  const trayCenter = {
-    x: tray.x + TRAY_SLOT_WIDTH / 2,
-    y: tray.y + TRAY_SLOT_HEIGHT / 2,
-  };
-  const getTrayHome = (w: number, h: number) => ({
-    x: trayCenter.x - w / 2,
-    y: trayCenter.y - h / 2,
-  });
 
   const isPlaced = Boolean(cat.currentPosition && gridRect && overlayRect);
 
-  const starting = (() => {
+  // FIXED TRAY HOME: Returns the exact top-left of the tray slot.
+  // No longer depends on pieceWidth or pieceHeight!
+  const getTrayHome = () => ({
+    x: tray.x,
+    y: tray.y,
+  });
+
+  const getTargetPosition = () => {
     if (isPlaced && cat.currentPosition && gridRect) {
       return toLocal(
         gridRect.x + cat.currentPosition.x * tileSize,
@@ -139,8 +136,10 @@ const DraggableCatPiece: React.FC<DraggableCatProps> = ({
         overlayRect
       );
     }
-    return getTrayHome(pieceWidth, pieceHeight);
-  })();
+    return getTrayHome();
+  };
+
+  const starting = getTargetPosition();
 
   const globalX = useSharedValue(starting.x);
   const globalY = useSharedValue(starting.y);
@@ -153,16 +152,7 @@ const DraggableCatPiece: React.FC<DraggableCatProps> = ({
   };
 
   const snapToRest = (ejected: boolean) => {
-    const target = (() => {
-      if (cat.currentPosition && gridRect) {
-        return toLocal(
-          gridRect.x + cat.currentPosition.x * tileSize,
-          gridRect.y + cat.currentPosition.y * tileSize,
-          overlayRect
-        );
-      }
-      return getTrayHome(pieceWidth, pieceHeight);
-    })();
+    const target = getTargetPosition();
 
     if (ejected && !cat.currentPosition) {
       globalY.value = withSequence(
@@ -269,7 +259,7 @@ const DraggableCatPiece: React.FC<DraggableCatProps> = ({
       return;
     }
 
-    const home = getTrayHome(pieceWidth, pieceHeight);
+    const home = getTrayHome();
     globalX.value = withSpring(home.x, { damping: 14, stiffness: 100 });
     globalY.value = withSpring(home.y, { damping: 14, stiffness: 100 });
     onDropCat(cat.id, null, true);
@@ -310,19 +300,17 @@ const DraggableCatPiece: React.FC<DraggableCatProps> = ({
 
   const composed = Gesture.Exclusive(panGesture, tapGesture);
 
+  // Recalibrate animation position when cat placement or grid measurements update
   useEffect(() => {
     if (draggingCatId.value === cat.id) return;
     snapToRest(ejectedCatId === cat.id);
   }, [
     cat.currentPosition?.x,
     cat.currentPosition?.y,
-    cat.shapeMatrix,
     gridRect?.x,
     gridRect?.y,
-    trayCenter.x,
-    trayCenter.y,
-    pieceWidth,
-    pieceHeight,
+    tray.x,
+    tray.y,
     ejectedCatId,
     tileSize,
   ]);
